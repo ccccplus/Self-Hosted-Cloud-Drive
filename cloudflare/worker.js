@@ -105,7 +105,9 @@ async function revokeAdminToken(db, token) {
 
 // OpenList WebDAV 异步同步
 async function syncItemToOpenList(env, item, fileBytes) {
-  if (!env.OPENLIST_WEBDAV_URL) return;
+  env.DB = env.DB || env['qr-relay-db'] || env.DATABASE || env.d1;
+  env.BUCKET = env.BUCKET || env['qr-relay-files'] || env.STORAGE || env.r2;
+  if (!env.OPENLIST_WEBDAV_URL || !env.DB) return;
   const baseUrl = env.OPENLIST_WEBDAV_URL.replace(/\/+$/, '');
   const backupDir = (env.OPENLIST_BACKUP_PATH || '/QR-Relay-Backup').replace(/\/+$/, '');
   const authHeaders = {};
@@ -129,6 +131,7 @@ async function syncItemToOpenList(env, item, fileBytes) {
       if (fileBytes) {
         uploadBody = fileBytes;
       } else {
+        if (!env.BUCKET) return;
         const obj = await env.BUCKET.get(item.content);
         if (obj) uploadBody = await obj.arrayBuffer();
       }
@@ -163,6 +166,9 @@ async function syncItemToOpenList(env, item, fileBytes) {
 
 // 过期物理清理 Worker
 async function cleanupExpiredItems(env) {
+  env.DB = env.DB || env['qr-relay-db'] || env.DATABASE || env.d1;
+  env.BUCKET = env.BUCKET || env['qr-relay-files'] || env.STORAGE || env.r2;
+  if (!env.DB) return;
   try {
     const now = new Date().toISOString();
     const { results } = await env.DB.prepare(
@@ -173,7 +179,9 @@ async function cleanupExpiredItems(env) {
 
     for (const it of results) {
       if (it.type === 'file' || it.type === 'image') {
-        try { await env.BUCKET.delete(it.content); } catch {}
+        if (env.BUCKET) {
+          try { await env.BUCKET.delete(it.content); } catch {}
+        }
       }
       await env.DB.prepare("DELETE FROM items WHERE code = ?").bind(it.code).run();
     }
@@ -194,33 +202,48 @@ export default {
       return corsOptionsResponse();
     }
 
+    // 自动兼容各种 Binding 命名
+    env.DB = env.DB || env['qr-relay-db'] || env.DATABASE || env.d1;
+    env.BUCKET = env.BUCKET || env['qr-relay-files'] || env.STORAGE || env.r2;
+
     // 确保数据库基础表存在
-    try {
-      await env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS items (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          code TEXT UNIQUE NOT NULL,
-          type TEXT NOT NULL,
-          title TEXT,
-          content TEXT,
-          file_size INTEGER DEFAULT 0,
-          mime_type TEXT,
-          created_at TEXT NOT NULL,
-          expires_at TEXT,
-          burn_after_reading INTEGER DEFAULT 0,
-          views_count INTEGER DEFAULT 0,
-          openlist_sync_status TEXT DEFAULT 'disabled',
-          openlist_sync_time TEXT,
-          openlist_sync_error TEXT
-        );
-      `).run();
-      await env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT);
-      `).run();
-      await env.DB.prepare(`
-        CREATE TABLE IF NOT EXISTS admin_tokens (token TEXT PRIMARY KEY, created_at TEXT);
-      `).run();
-    } catch {}
+    if (env.DB) {
+      try {
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            code TEXT UNIQUE NOT NULL,
+            type TEXT NOT NULL,
+            title TEXT,
+            content TEXT,
+            file_size INTEGER DEFAULT 0,
+            mime_type TEXT,
+            created_at TEXT NOT NULL,
+            expires_at TEXT,
+            burn_after_reading INTEGER DEFAULT 0,
+            views_count INTEGER DEFAULT 0,
+            openlist_sync_status TEXT DEFAULT 'disabled',
+            openlist_sync_time TEXT,
+            openlist_sync_error TEXT
+          );
+        `).run();
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS system_settings (key TEXT PRIMARY KEY, value TEXT);
+        `).run();
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS admin_tokens (token TEXT PRIMARY KEY, created_at TEXT);
+        `).run();
+      } catch {}
+    }
+
+    // 若 API 请求且未绑定 D1 数据库，给出明确友好提示
+    if (path.startsWith('/api/') && path !== '/api/qrcode') {
+      if (!env.DB) {
+        return jsonResponse({
+          detail: "Cloudflare D1 数据库未绑定。请在 Cloudflare Workers 控制台 [设置] -> [绑定] 中添加 D1 数据库，变量名称设为 DB 或 qr-relay-db。"
+        }, 500);
+      }
+    }
 
     // --- 路由 1: 静态前端与取件页 ---
     if (path.startsWith('/s/')) {
@@ -359,6 +382,12 @@ export default {
       const mimeType = file.type || 'application/octet-stream';
       const itemType = mimeType.startsWith('image/') ? 'image' : 'file';
       const r2Key = `uploads/${code}_${file.name}`;
+
+      if (!env.BUCKET) {
+        return jsonResponse({
+          detail: "Cloudflare R2 存储桶未绑定。请在 Cloudflare Workers 控制台 [设置] -> [绑定] 中添加 R2 存储桶，变量名称设为 qr-relay-files 或 BUCKET。"
+        }, 500);
+      }
 
       const fileBuffer = await file.arrayBuffer();
       await env.BUCKET.put(r2Key, fileBuffer, {
@@ -637,6 +666,8 @@ export default {
 
   // Cron 触发器自动过期物理清理
   async scheduled(event, env, ctx) {
-    if (ctx) ctx.waitUntil(cleanupExpiredItems(env));
+    env.DB = env.DB || env['qr-relay-db'] || env.DATABASE || env.d1;
+    env.BUCKET = env.BUCKET || env['qr-relay-files'] || env.STORAGE || env.r2;
+    if (env.DB && ctx) ctx.waitUntil(cleanupExpiredItems(env));
   }
 };

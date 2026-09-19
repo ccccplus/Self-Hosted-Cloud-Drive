@@ -1,4 +1,4 @@
-name = "qr-relay"
+name = "self-hosted-cloud-drive"
 main = "cloudflare/worker.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
@@ -16,13 +16,13 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "qr-relay-db"
-database_id = "qr-relay-db"
+database_id = "0b63031a-3432-4d0b-83e5-ac9a1168e876"
 
 # -------------------------------------------------------------
 # Cloudflare R2 (Object Storage for files and images)
 # -------------------------------------------------------------
 [[r2_buckets]]
-binding = "BUCKET"
+binding = "qr-relay-files"
 bucket_name = "qr-relay-files"
 
 # -------------------------------------------------------------
