@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#f8fafc" />
   <title>QR-Relay | 临时云盘与二维码中转站</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -28,36 +31,111 @@
     }
   </script>
   <style>
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
     [v-cloak] { display: none; }
+    html, body {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    body {
+      padding-top: max(0.5rem, var(--sat));
+      /* Mobile safe area padding for bottom floating dock navigation bar */
+      padding-bottom: calc(var(--sab) + 5.5rem);
+    }
+    @media (min-width: 640px) {
+      body {
+        padding-top: max(1.5rem, var(--sat));
+        padding-bottom: max(2rem, var(--sab));
+      }
+    }
+    /* Prevent iOS Safari from auto-zooming when focusing inputs */
+    @media screen and (max-width: 640px) {
+      input, textarea, select {
+        font-size: 16px !important;
+      }
+    }
     .glass-card {
       background: rgba(255, 255, 255, 0.94);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+    .glass-dock {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
     }
     .code-box-letter {
       letter-spacing: 0.35em;
+    }
+    /* Sleek slim scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.35);
+      border-radius: 9999px;
     }
   </style>
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 min-h-screen text-slate-800 font-sans antialiased">
   
-  <div class="max-w-4xl mx-auto px-4 py-8">
-    <!-- Header -->
-    <header class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8 pb-4 border-b border-slate-200/80">
-      <div class="flex items-center gap-3">
+  <div class="max-w-4xl mx-auto px-3 sm:px-6">
+
+    <!-- Mobile Compact Top Bar (App-like, saves screen height) -->
+    <header class="flex sm:hidden items-center justify-between gap-2 mb-4 pt-1 pb-2 border-b border-slate-200/60">
+      <div class="flex items-center gap-2">
+        <div class="w-9 h-9 bg-gradient-to-tr from-brand-600 to-purple-600 rounded-xl flex items-center justify-center text-white shadow-md shadow-brand-500/25">
+          <i class="fa-solid fa-qrcode text-lg"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-black tracking-tight text-slate-900 flex items-center gap-1.5">
+            QR-Relay
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          </h1>
+          <p class="text-[10px] text-slate-400 font-medium">临时云盘 · 极速快传</p>
+        </div>
+      </div>
+
+      <!-- Mobile Quick Pickup Pill -->
+      <div class="flex items-center bg-white/90 border border-slate-200 shadow-sm rounded-xl p-1">
+        <input 
+          id="quickCodeInputMobile" 
+          type="text" 
+          placeholder="6位取件码" 
+          maxlength="10"
+          class="w-20 px-2 py-1 text-xs bg-transparent outline-none font-mono font-bold text-slate-800 uppercase placeholder:text-slate-400 placeholder:font-normal"
+          onkeypress="if(event.key === 'Enter') handleQuickPickup()"
+        />
+        <button 
+          onclick="handleQuickPickup()"
+          class="px-2.5 py-1 text-[11px] bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-lg shadow-sm transition-all"
+        >
+          取件
+        </button>
+      </div>
+    </header>
+
+    <!-- Desktop Header (Full-featured layout) -->
+    <header class="hidden sm:flex items-center justify-between gap-4 mb-8 pb-5 border-b border-slate-200/80">
+      <div class="flex items-center gap-3.5">
         <div class="w-12 h-12 bg-gradient-to-tr from-brand-600 to-purple-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-brand-500/30">
           <i class="fa-solid fa-qrcode text-2xl"></i>
         </div>
         <div>
           <h1 class="text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
             QR-Relay
-            <span class="text-xs px-2.5 py-0.5 rounded-full bg-brand-100 text-brand-700 font-semibold">自建中转站</span>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-brand-100 text-brand-700 font-bold">自建中转站</span>
           </h1>
-          <p class="text-xs text-slate-500">文字 · 图片 · 临时云盘 · 6位口令取件 · 归档至 OpenList</p>
+          <p class="text-xs text-slate-500 mt-0.5">文字 · 图片 · 临时云盘 · 6位口令取件 · 归档至 OpenList</p>
         </div>
       </div>
 
-      <!-- Quick Pickup Box -->
-      <div class="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-slate-200 shadow-sm w-full sm:w-auto">
+      <!-- Desktop Quick Pickup Box -->
+      <div class="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
         <div class="pl-2 text-slate-400">
           <i class="fa-solid fa-box-archive text-sm"></i>
         </div>
@@ -66,20 +144,20 @@
           type="text" 
           placeholder="输入6位取件码" 
           maxlength="10"
-          class="w-32 px-2 py-1 text-sm bg-transparent outline-none font-mono font-medium text-slate-700 uppercase"
+          class="w-32 px-2 py-1.5 text-sm bg-transparent outline-none font-mono font-bold text-slate-800 uppercase placeholder:text-slate-400 placeholder:font-normal"
           onkeypress="if(event.key === 'Enter') handleQuickPickup()"
         />
         <button 
           onclick="handleQuickPickup()"
-          class="px-3.5 py-1.5 text-xs bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg transition-all shadow-sm active:scale-95 flex items-center gap-1"
+          class="px-4 py-2 text-xs bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-xl transition-all shadow-sm flex items-center gap-1"
         >
           <span>取件</span>
         </button>
       </div>
     </header>
 
-    <!-- Navigation Tabs -->
-    <nav class="flex items-center gap-1.5 mb-6 p-1.5 bg-slate-200/60 rounded-2xl max-w-lg mx-auto">
+    <!-- Desktop Navigation Tabs (Hidden on mobile) -->
+    <nav class="hidden sm:flex items-center gap-1.5 mb-6 p-1.5 bg-slate-200/60 rounded-2xl max-w-lg mx-auto">
       <button 
         onclick="switchTab('text')" 
         id="tab-btn-text" 
@@ -112,170 +190,179 @@
     </nav>
 
     <!-- Tab 1: Text Relay (Default) -->
-    <section id="tab-text" class="glass-card rounded-3xl p-6 sm:p-8 border border-white/60 shadow-xl shadow-slate-200/50 mb-8">
+    <section id="tab-text" class="glass-card rounded-3xl p-5 sm:p-8 border border-white/70 shadow-xl shadow-slate-200/50 mb-6 sm:mb-8 transition-all">
       <div class="space-y-4">
         <div class="flex items-center justify-between">
-          <label class="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+          <label class="text-sm font-bold text-slate-800 flex items-center gap-1.5">
             <span>输入文字或备忘</span>
-            <span class="text-xs font-normal text-slate-400">(支持长文本、代码、WiFi密码等)</span>
+            <span class="text-xs font-normal text-slate-400 hidden sm:inline">(支持长文本、代码、WiFi密码)</span>
           </label>
-          <span id="charCount" class="text-xs font-mono text-slate-400">0 字符</span>
+          <span id="charCount" class="text-xs font-mono text-slate-400 bg-slate-100 px-2 py-0.5 rounded-md">0 字符</span>
         </div>
 
         <textarea 
           id="textInput"
-          rows="6"
+          rows="5"
           placeholder="在此输入文字，或按 Ctrl+V 粘贴文本... 短文本可直接编码为离线二维码，手机相机扫码即可识别！"
-          class="w-full p-4 rounded-2xl bg-white border border-slate-200 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none text-slate-800 text-sm transition-all resize-y shadow-sm font-sans"
+          class="w-full p-3.5 sm:p-4 rounded-2xl bg-white border border-slate-200/90 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/10 outline-none text-slate-800 text-base sm:text-sm transition-all resize-y shadow-sm font-sans placeholder:text-slate-400"
           oninput="updateCharCount()"
         ></textarea>
 
-        <!-- Generation Mode Switch -->
+        <!-- Generation Mode Switch (Modern Segmented Pill on Mobile & Desktop) -->
         <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-          <div class="flex items-center gap-2">
-            <span class="font-bold text-slate-700">二维码生成模式:</span>
-            <label class="inline-flex items-center gap-1.5 cursor-pointer">
-              <input type="radio" name="qrMode" value="auto" checked class="text-brand-600 focus:ring-brand-500" />
-              <span>智能模式 <span class="text-slate-400">(短文本直接生码)</span></span>
-            </label>
-            <div class="inline-flex items-center gap-1.5 ml-2">
-              <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" name="qrMode" value="page" class="text-brand-600 focus:ring-brand-500" />
-                <span class="font-semibold">6位口令取件码</span>
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <span class="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">二维码生成模式:</span>
+            
+            <!-- Segmented Control -->
+            <div class="grid grid-cols-2 sm:flex items-center bg-slate-200/70 p-1 rounded-xl w-full sm:w-auto gap-1">
+              <label class="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-all has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-xs text-slate-600">
+                <input type="radio" name="qrMode" value="auto" checked class="hidden" />
+                <i class="fa-solid fa-bolt text-[11px]"></i>
+                <span>智能模式 <span class="text-[10px] opacity-75 hidden sm:inline">(离线生码)</span></span>
               </label>
-              <input 
-                type="text" 
-                id="textCustomCode" 
-                maxlength="10" 
-                placeholder="自定义口令(选填)" 
-                class="w-36 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-700 outline-none focus:border-brand-500 shadow-sm" 
-              />
+
+              <label class="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-all has-[:checked]:bg-white has-[:checked]:text-brand-700 has-[:checked]:shadow-xs text-slate-600">
+                <input type="radio" name="qrMode" value="page" class="hidden" />
+                <i class="fa-solid fa-key text-[11px]"></i>
+                <span>6位口令取件码</span>
+              </label>
             </div>
+          </div>
+
+          <div class="w-full sm:w-auto flex items-center gap-2">
+            <input 
+              type="text" 
+              id="textCustomCode" 
+              maxlength="10" 
+              placeholder="自定义口令 (选填)" 
+              class="w-full sm:w-40 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono font-medium text-slate-700 outline-none focus:border-brand-500 shadow-sm" 
+            />
           </div>
         </div>
 
         <!-- Options Row -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
           <!-- Expire TTL -->
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">有效期</label>
-            <select id="textExpire" class="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 outline-none focus:border-brand-500">
+            <label class="block text-xs font-bold text-slate-500 mb-1">有效期设置</label>
+            <select id="textExpire" class="w-full p-3 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 outline-none focus:border-brand-500 shadow-xs">
               <option value="600">10 分钟</option>
               <option value="3600">1 小时</option>
               <option value="86400" selected>24 小时 (1天)</option>
               <option value="604800">7 天</option>
-              <option value="-1">阅后即焚 (提取一次即删)</option>
+              <option value="-1">阅后即焚 (提取一次即销毁)</option>
               <option value="0">永久保存</option>
             </select>
           </div>
 
           <!-- OpenList Backup -->
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">OpenList 备份</label>
-            <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 cursor-pointer">
+            <label class="block text-xs font-bold text-slate-500 mb-1">多网盘容灾备份</label>
+            <label class="flex items-center gap-2 p-3 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer shadow-xs">
               <input type="checkbox" id="textSyncOpenList" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500" />
-              <span>同步至网盘</span>
+              <span>同步至 OpenList 网盘</span>
             </label>
           </div>
 
           <!-- Title / Note -->
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">可选标题</label>
-            <input type="text" id="textTitle" placeholder="如：备忘片段" class="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 outline-none focus:border-brand-500" />
+            <label class="block text-xs font-bold text-slate-500 mb-1">备注标题 (选填)</label>
+            <input type="text" id="textTitle" placeholder="如：备忘片段 / 路由器密码" class="w-full p-3 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-xs text-slate-700 outline-none focus:border-brand-500 shadow-xs" />
           </div>
         </div>
 
         <!-- Submit Button -->
-        <div class="pt-4 flex justify-end">
+        <div class="pt-2">
           <button 
             onclick="submitText()"
             id="btnSubmitText"
-            class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 active:scale-98"
+            class="w-full sm:w-auto sm:ml-auto px-8 py-3.5 sm:py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white font-bold text-sm sm:text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
           >
-            <i class="fa-solid fa-bolt"></i> 生成 6 位取件码与二维码
+            <i class="fa-solid fa-bolt text-amber-300"></i>
+            <span>生成 6 位取件码与二维码</span>
           </button>
         </div>
       </div>
     </section>
 
     <!-- Tab 2: File/Image Cloud Drop -->
-    <section id="tab-file" class="hidden glass-card rounded-3xl p-6 sm:p-8 border border-white/60 shadow-xl shadow-slate-200/50 mb-8">
+    <section id="tab-file" class="hidden glass-card rounded-3xl p-5 sm:p-8 border border-white/70 shadow-xl shadow-slate-200/50 mb-6 sm:mb-8 transition-all">
       <div class="space-y-4">
         <div class="flex items-center justify-between">
-          <label class="text-sm font-bold text-slate-700">拖拽上传或粘贴图片</label>
-          <span class="text-xs text-brand-600 font-medium bg-brand-50 px-2.5 py-0.5 rounded-md">
+          <label class="text-sm font-bold text-slate-800">上传图片或附件文件</label>
+          <span class="text-[11px] text-brand-600 font-semibold bg-brand-50 px-2.5 py-0.5 rounded-md hidden sm:inline">
             💡 支持任意位置直接 Ctrl + V 粘贴截图
           </span>
         </div>
 
-        <!-- Drop Zone -->
+        <!-- Drop Zone (Mobile friendly, huge touch target) -->
         <div 
           id="dropZone"
           onclick="document.getElementById('fileInput').click()"
-          class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-3xl p-8 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-3"
+          class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-3xl p-6 sm:p-8 text-center cursor-pointer transition-all bg-slate-50/50 hover:bg-brand-50/30 flex flex-col items-center justify-center gap-3 active:scale-[0.99]"
         >
-          <div class="w-16 h-16 rounded-2xl bg-indigo-100 text-brand-600 flex items-center justify-center text-2xl shadow-inner">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-indigo-100 text-brand-600 flex items-center justify-center text-2xl shadow-inner">
             <i class="fa-solid fa-cloud-arrow-up"></i>
           </div>
           <div>
-            <p class="text-sm font-bold text-slate-700">点击选择文件，或将文件/图片拖拽至此</p>
+            <p class="text-sm sm:text-base font-bold text-slate-800">点击拍照 / 选取手机相册照片或文件</p>
             <p class="text-xs text-slate-400 mt-1">单文件上限 100MB，上传后将生成专属 6 位取件码与下载二维码</p>
           </div>
           <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected(event)" />
         </div>
 
         <!-- Selected File Preview -->
-        <div id="filePreviewContainer" class="hidden bg-white p-4 rounded-2xl border border-slate-200 flex items-center justify-between">
+        <div id="filePreviewContainer" class="hidden bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 flex items-center justify-between shadow-xs">
           <div class="flex items-center gap-3 overflow-hidden">
             <div id="previewIcon" class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 text-lg flex-shrink-0">
               <i class="fa-solid fa-file"></i>
             </div>
             <div class="overflow-hidden">
               <p id="previewFileName" class="text-xs font-bold text-slate-800 truncate">filename.zip</p>
-              <p id="previewFileSize" class="text-[11px] text-slate-400">0 KB</p>
+              <p id="previewFileSize" class="text-[11px] text-slate-400 font-mono">0 KB</p>
             </div>
           </div>
-          <button onclick="clearSelectedFile()" class="text-slate-400 hover:text-red-500 p-2 text-xs">
-            <i class="fa-solid fa-xmark text-sm"></i>
+          <button onclick="clearSelectedFile()" class="text-slate-400 hover:text-rose-500 p-2 text-xs active:scale-90 transition-all">
+            <i class="fa-solid fa-xmark text-base"></i>
           </button>
         </div>
 
-        <!-- File Mode & Inline Custom Code -->
-        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 flex items-center justify-between flex-wrap gap-2 text-xs">
-          <div class="flex items-center gap-2 flex-wrap">
+        <!-- File Mode & Custom Code -->
+        <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
             <span class="font-bold text-slate-700">取件模式:</span>
-            <span class="font-semibold text-slate-700">6位口令取件码</span>
-            <div class="inline-flex items-center gap-1.5 ml-2">
-              <input 
-                type="text" 
-                id="fileCustomCode" 
-                maxlength="10" 
-                placeholder="自定义口令(选填，留空自动生成)" 
-                class="w-56 px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-mono text-slate-700 outline-none focus:border-brand-500 shadow-sm" 
-              />
-            </div>
+            <span class="font-semibold text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-slate-200">6位专属口令码</span>
+          </div>
+          <div class="w-full sm:w-auto">
+            <input 
+              type="text" 
+              id="fileCustomCode" 
+              maxlength="10" 
+              placeholder="自定义口令 (选填，留空自动生成)" 
+              class="w-full sm:w-60 px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-mono text-slate-700 outline-none focus:border-brand-500 shadow-sm" 
+            />
           </div>
         </div>
 
         <!-- File Options -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <!-- Validity -->
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">临时有效期</label>
-            <select id="fileExpire" class="w-full p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 outline-none focus:border-brand-500">
+            <label class="block text-xs font-bold text-slate-500 mb-1">临时有效期</label>
+            <select id="fileExpire" class="w-full p-3 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 outline-none focus:border-brand-500 shadow-xs">
               <option value="600">10 分钟</option>
               <option value="3600">1 小时</option>
               <option value="86400" selected>24 小时 (1天)</option>
               <option value="604800">7 天</option>
-              <option value="-1">阅后即焚 (下载一次即删)</option>
+              <option value="-1">阅后即焚 (下载一次即销毁)</option>
               <option value="0">永久保存</option>
             </select>
           </div>
 
           <!-- OpenList Sync -->
           <div>
-            <label class="block text-xs font-semibold text-slate-500 mb-1">OpenList 容灾备份</label>
-            <label class="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-medium text-slate-700 cursor-pointer">
+            <label class="block text-xs font-bold text-slate-500 mb-1">OpenList 容灾备份</label>
+            <label class="flex items-center gap-2 p-3 sm:p-2.5 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 cursor-pointer shadow-xs">
               <input type="checkbox" id="fileSyncOpenList" checked class="w-4 h-4 rounded text-brand-600 focus:ring-brand-500" />
               <span>自动同步至云盘备份</span>
             </label>
@@ -283,47 +370,48 @@
         </div>
 
         <!-- Upload Progress -->
-        <div id="uploadProgressContainer" class="hidden space-y-1 pt-2">
-          <div class="flex justify-between text-xs text-slate-500 font-mono">
+        <div id="uploadProgressContainer" class="hidden space-y-1.5 pt-2">
+          <div class="flex justify-between text-xs text-slate-600 font-mono">
             <span id="uploadStatusText">正在上传并生成 6 位取件口令...</span>
-            <span id="uploadPercent">0%</span>
+            <span id="uploadPercent" class="font-bold text-brand-600">0%</span>
           </div>
-          <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-            <div id="uploadProgressBar" class="bg-brand-600 h-2 rounded-full transition-all duration-200" style="width: 0%"></div>
+          <div class="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+            <div id="uploadProgressBar" class="bg-gradient-to-r from-brand-600 to-indigo-600 h-2.5 rounded-full transition-all duration-200" style="width: 0%"></div>
           </div>
         </div>
 
-        <div class="pt-4 flex justify-end">
+        <div class="pt-2">
           <button 
             onclick="submitFile()"
             id="btnSubmitFile"
-            class="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 active:scale-98"
+            class="w-full sm:w-auto sm:ml-auto px-8 py-3.5 sm:py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 text-white font-bold text-sm sm:text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
           >
-            <i class="fa-solid fa-cloud-arrow-up"></i> 生成 6 位取件码与二维码
+            <i class="fa-solid fa-cloud-arrow-up"></i>
+            <span>上传文件并生成 6 位取件码</span>
           </button>
         </div>
       </div>
     </section>
 
     <!-- Tab 3: History & Items List -->
-    <section id="tab-history" class="hidden glass-card rounded-3xl p-6 sm:p-8 border border-white/60 shadow-xl shadow-slate-200/50 mb-8">
+    <section id="tab-history" class="hidden glass-card rounded-3xl p-5 sm:p-8 border border-white/70 shadow-xl shadow-slate-200/50 mb-6 sm:mb-8 transition-all">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div class="flex items-center gap-2">
-          <h2 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <h2 class="text-sm sm:text-base font-bold text-slate-800 flex items-center gap-2">
             <i class="fa-solid fa-inbox text-brand-600"></i> 中转箱
           </h2>
           <span id="historyRoleBadge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium transition-all">仅本设备上传记录</span>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
           <!-- Quick Type Filters -->
-          <div class="flex items-center bg-slate-100/90 p-0.5 rounded-xl text-[11px]">
+          <div class="flex items-center bg-slate-100/90 p-0.5 rounded-xl text-[11px] flex-1 sm:flex-none justify-around sm:justify-start">
             <button onclick="setHistoryFilter('all')" id="filterBtn-all" class="px-2.5 py-1 rounded-lg font-bold bg-white text-brand-600 shadow-sm transition-all">全部</button>
             <button onclick="setHistoryFilter('file')" id="filterBtn-file" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition-all">📁 文件</button>
             <button onclick="setHistoryFilter('text')" id="filterBtn-text" class="px-2.5 py-1 rounded-lg font-medium text-slate-600 hover:text-slate-900 transition-all">📝 文本</button>
           </div>
 
-          <button onclick="loadRecentItems()" class="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-1 ml-1 px-2 py-1 rounded-lg hover:bg-brand-50 transition-all">
+          <button onclick="loadRecentItems()" class="text-xs text-brand-600 hover:text-brand-700 font-semibold flex items-center gap-1 px-2.5 py-1 rounded-lg hover:bg-brand-50 transition-all whitespace-nowrap">
             <i class="fa-solid fa-rotate text-xs"></i> 刷新
           </button>
         </div>
@@ -338,10 +426,10 @@
     </section>
 
     <!-- Tab 4: OpenList Multi-Drive Settings & Detection -->
-    <section id="tab-openlist" class="hidden glass-card rounded-3xl p-6 sm:p-8 border border-white/60 shadow-xl shadow-slate-200/50 mb-8">
-      <div class="space-y-6">
+    <section id="tab-openlist" class="hidden glass-card rounded-3xl p-5 sm:p-8 border border-white/70 shadow-xl shadow-slate-200/50 mb-6 sm:mb-8 transition-all">
+      <div class="space-y-5">
         <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-xl">
+          <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-xl flex-shrink-0">
             <i class="fa-solid fa-hard-drive"></i>
           </div>
           <div>
@@ -351,14 +439,14 @@
         </div>
 
         <!-- Clear Visual Explanation of OpenList Storage Mechanism -->
-        <div class="bg-indigo-50/70 p-5 rounded-2xl border border-indigo-100/80 text-xs text-slate-700 space-y-3">
+        <div class="bg-indigo-50/70 p-4 sm:p-5 rounded-2xl border border-indigo-100/80 text-xs text-slate-700 space-y-2.5">
           <h3 class="font-bold text-brand-800 flex items-center gap-2 text-sm">
             <i class="fa-solid fa-diagram-project"></i> OpenList 存储映射原理
           </h3>
           <p class="leading-relaxed">
             OpenList 核心是将各个网盘映射为<strong>虚拟根目录</strong>下的文件夹：
           </p>
-          <div class="bg-white/80 p-3 rounded-xl border border-indigo-100 font-mono text-[11px] text-slate-600 space-y-1">
+          <div class="bg-white/80 p-3 rounded-xl border border-indigo-100 font-mono text-[11px] text-slate-600 space-y-1 overflow-x-auto">
             <p>├── /aliyun       <span class="text-slate-400">-> 对应你的「阿里云盘」</span></p>
             <p>├── /onedrive     <span class="text-slate-400">-> 对应你的「OneDrive」</span></p>
             <p>├── /quark        <span class="text-slate-400">-> 对应你的「夸克网盘」</span></p>
@@ -370,24 +458,24 @@
         </div>
 
         <!-- Current Configuration Box -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 space-y-4 text-xs">
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4 text-xs">
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <div>
               <span class="text-slate-500 font-medium block">WebDAV 服务配置</span>
               <span id="cfgWebdavStatus" class="font-mono text-slate-700 font-semibold text-xs">读取中...</span>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2 flex-wrap">
               <button 
                 onclick="testOpenListConnection()" 
                 id="btnTestOpenList"
-                class="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow transition-all flex items-center gap-1.5"
+                class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow transition-all flex items-center gap-1.5 active:scale-95"
               >
                 <i class="fa-solid fa-plug"></i> 测试连接
               </button>
               <button 
                 onclick="detectOpenListMounts()" 
                 id="btnDetectMounts"
-                class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow transition-all flex items-center gap-1.5"
+                class="px-3.5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-xl shadow transition-all flex items-center gap-1.5 active:scale-95"
               >
                 <i class="fa-solid fa-compass"></i> 探测已挂载网盘
               </button>
@@ -410,7 +498,7 @@
               <label class="block text-slate-800 font-bold text-xs">
                 <i class="fa-solid fa-server text-brand-600"></i> OpenList / AList WebDAV 连接设置：
               </label>
-              <span class="text-[11px] text-slate-400">（保存后立即生效并测试连接）</span>
+              <span class="text-[11px] text-slate-400 hidden sm:inline">（保存后立即生效并测试连接）</span>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -455,20 +543,21 @@
               </div>
             </div>
 
-            <div class="flex flex-wrap items-center gap-3 pt-2">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-2">
               <button 
                 onclick="saveOpenListConfig()"
                 id="btnSaveOpenList"
-                class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-2"
+                class="w-full sm:w-auto px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-2 active:scale-95"
               >
                 <i class="fa-solid fa-floppy-disk"></i> 保存 OpenList 配置并测试
               </button>
-              <span class="text-[11px] text-slate-400">💡 提示：若未部署 OpenList，无需填写此项，文件默认安全存放在 Cloudflare R2 中。</span>
+              <span class="text-[11px] text-slate-400">💡 提示：若未部署 OpenList，无需填写此项，文件默认安全存放在 R2/本地磁盘中。</span>
             </div>
           </div>
         </div>
+
         <!-- Admin Password Change Section in OpenList Tab -->
-        <div class="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 text-xs">
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3 text-xs">
           <h3 class="font-bold text-slate-800 flex items-center gap-2 text-xs">
             <i class="fa-solid fa-key text-purple-600"></i> 管理员密码修改
           </h3>
@@ -493,7 +582,7 @@
             <button 
               onclick="changeAdminPassword()"
               id="btnChangePassword"
-              class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-1.5"
+              class="w-full sm:w-auto px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 active:scale-95"
             >
               <i class="fa-solid fa-check"></i> 更新密码
             </button>
@@ -502,8 +591,8 @@
       </div>
     </section>
 
-    <!-- Footer & Admin Entry -->
-    <footer class="mt-12 pt-6 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
+    <!-- Desktop Footer & Admin Entry -->
+    <footer class="mt-8 pt-6 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
       <div class="flex items-center gap-2">
         <span>QR-Relay · 临时云盘与二维码中转站</span>
         <span class="text-slate-300">|</span>
@@ -533,24 +622,60 @@
 
   </div>
 
+  <!-- Mobile Floating Dock Navigation Bar (Native App Style, Ergonomic) -->
+  <div class="sm:hidden fixed bottom-3 left-3 right-3 z-40 glass-dock border border-white/80 shadow-2xl shadow-slate-900/10 rounded-2xl p-1.5 flex items-center justify-around">
+    <button 
+      onclick="switchTab('text')" 
+      id="tab-bottom-btn-text" 
+      class="flex-1 py-1.5 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-brand-600 bg-brand-50/90 font-bold transition-all active:scale-95"
+    >
+      <i class="fa-solid fa-font text-sm"></i>
+      <span class="text-[10px]">文字快传</span>
+    </button>
+    <button 
+      onclick="switchTab('file')" 
+      id="tab-bottom-btn-file" 
+      class="flex-1 py-1.5 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium hover:text-slate-800 transition-all active:scale-95"
+    >
+      <i class="fa-solid fa-cloud-arrow-up text-sm"></i>
+      <span class="text-[10px]">云盘文件</span>
+    </button>
+    <button 
+      onclick="switchTab('history')" 
+      id="tab-bottom-btn-history" 
+      class="flex-1 py-1.5 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium hover:text-slate-800 transition-all active:scale-95"
+    >
+      <i class="fa-solid fa-clock-rotate-left text-sm"></i>
+      <span class="text-[10px]">中转箱</span>
+    </button>
+    <button 
+      onclick="handleBottomSettingsClick()" 
+      id="tab-bottom-btn-openlist" 
+      class="flex-1 py-1.5 px-2 rounded-xl flex flex-col items-center justify-center gap-0.5 text-slate-500 font-medium hover:text-slate-800 transition-all active:scale-95"
+    >
+      <i id="bottomSettingIcon" class="fa-solid fa-sliders text-sm"></i>
+      <span id="bottomSettingLabel" class="text-[10px]">管理设置</span>
+    </button>
+  </div>
+
   <!-- QR Code & Success Modal -->
-  <div id="qrModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100 transform transition-all">
+  <div id="qrModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 text-center shadow-2xl border border-slate-100 transform transition-all max-h-[92vh] overflow-y-auto">
       <div class="flex justify-between items-center mb-3">
         <span class="text-xs font-bold uppercase tracking-wider text-brand-600 bg-brand-50 px-2.5 py-1 rounded-full">
           生成成功
         </span>
-        <button onclick="closeQrModal()" class="text-slate-400 hover:text-slate-600 p-1">
+        <button onclick="closeQrModal()" class="text-slate-400 hover:text-slate-600 p-1 active:scale-90 transition-all">
           <i class="fa-solid fa-xmark text-lg"></i>
         </button>
       </div>
 
       <!-- Prominent 6-Digit Pickup Code Display -->
-      <div class="bg-gradient-to-br from-indigo-50 to-purple-50 p-3.5 rounded-2xl border border-indigo-100 mb-4">
+      <div class="bg-gradient-to-br from-indigo-50 to-purple-50 p-3.5 rounded-2xl border border-indigo-100 mb-3.5">
         <p class="text-[11px] font-bold text-brand-600 mb-0.5 tracking-wider">6 位 取 件 口 令</p>
-        <div class="flex items-center justify-center gap-2">
-          <span id="modalPickupCode" class="text-3xl font-black font-mono tracking-widest text-slate-900">------</span>
-          <button onclick="copyPickupCode()" class="text-brand-600 hover:text-brand-700 p-1 text-sm" title="复制口令">
+        <div class="flex items-center justify-center gap-2.5">
+          <span id="modalPickupCode" class="text-3xl sm:text-4xl font-black font-mono tracking-widest text-slate-900">------</span>
+          <button onclick="copyPickupCode()" class="w-8 h-8 rounded-xl bg-white border border-indigo-200 text-brand-600 hover:text-brand-700 flex items-center justify-center text-sm shadow-xs active:scale-90 transition-all" title="复制口令">
             <i class="fa-regular fa-copy"></i>
           </button>
         </div>
@@ -569,13 +694,21 @@
         <button id="btnSwitchShare" onclick="switchModalQr('share')" class="flex-1 py-1 rounded-md font-bold bg-white text-brand-600 shadow-sm">网页取件码</button>
       </div>
 
-      <!-- Action Button: White text on Purple background -->
-      <div class="pt-1">
+      <p class="text-[11px] text-slate-400 mb-3">💡 手机端可长按保存二维码，或点击下方按钮复制链接</p>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2">
         <button 
           onclick="copyShareLink()"
-          class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-md shadow-purple-500/25 transition-all flex items-center justify-center gap-2 active:scale-98"
+          class="w-full py-3 bg-purple-600 hover:bg-purple-700 active:scale-[0.98] text-white font-bold text-xs rounded-xl shadow-md shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
         >
           <i class="fa-solid fa-link"></i> 复制提取网页链接
+        </button>
+        <button 
+          onclick="copySharePromptText()"
+          class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+        >
+          <i class="fa-regular fa-comment-dots text-brand-600"></i> 复制好友取件文案
         </button>
       </div>
     </div>
@@ -589,7 +722,7 @@
           <i class="fa-solid fa-shield-halved text-purple-600"></i>
           <span>管理员认证</span>
         </div>
-        <button onclick="closeAdminModal()" class="text-slate-400 hover:text-slate-600 p-1">
+        <button onclick="closeAdminModal()" class="text-slate-400 hover:text-slate-600 p-1 active:scale-90">
           <i class="fa-solid fa-xmark text-sm"></i>
         </button>
       </div>
@@ -599,14 +732,14 @@
         <input 
           type="password" 
           id="adminPasswordInput"
-          placeholder="请输入管理员密码"
-          class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 outline-none focus:border-purple-500 focus:bg-white"
+          placeholder="输入管理员密码"
+          class="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs outline-none focus:border-purple-500 font-mono"
           onkeypress="if(event.key === 'Enter') submitAdminLogin()"
         />
         <button 
           onclick="submitAdminLogin()"
           id="btnSubmitAdminLogin"
-          class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-md shadow-purple-500/25 transition-all flex items-center justify-center gap-1.5"
+          class="w-full py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-1.5 active:scale-95"
         >
           <i class="fa-solid fa-key"></i> 验证并登录
         </button>
@@ -614,8 +747,11 @@
     </div>
   </div>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+  <!-- Centered / Bottom Floating Toast Notification -->
+  <div 
+    id="toast" 
+    class="fixed bottom-20 sm:bottom-6 left-1/2 -translate-x-1/2 sm:left-auto sm:right-6 sm:translate-x-0 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 transform translate-y-24 sm:translate-y-20 opacity-0 pointer-events-none transition-all duration-300 z-50 whitespace-nowrap"
+  >
     <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
     <span id="toastMsg">操作成功</span>
   </div>
@@ -694,6 +830,8 @@
       const btnLogin = document.getElementById('btnAdminLoginTrigger');
       const btnLogout = document.getElementById('btnAdminLogoutTrigger');
       const historyRoleBadge = document.getElementById('historyRoleBadge');
+      const bottomSettingLabel = document.getElementById('bottomSettingLabel');
+      const bottomSettingIcon = document.getElementById('bottomSettingIcon');
 
       if (active) {
         if (openlistTabBtn) openlistTabBtn.classList.remove('hidden');
@@ -706,6 +844,8 @@
         }
         if (btnLogin) btnLogin.classList.add('hidden');
         if (btnLogout) btnLogout.classList.remove('hidden');
+        if (bottomSettingLabel) bottomSettingLabel.innerText = '网盘/设置';
+        if (bottomSettingIcon) bottomSettingIcon.className = 'fa-solid fa-crown text-sm text-amber-500';
       } else {
         if (openlistTabBtn) openlistTabBtn.classList.add('hidden');
         if (roleIndicator) {
@@ -717,9 +857,19 @@
         }
         if (btnLogin) btnLogin.classList.remove('hidden');
         if (btnLogout) btnLogout.classList.add('hidden');
+        if (bottomSettingLabel) bottomSettingLabel.innerText = '管理入口';
+        if (bottomSettingIcon) bottomSettingIcon.className = 'fa-solid fa-sliders text-sm';
         if (currentTab === 'openlist') {
           switchTab('text');
         }
+      }
+    }
+
+    function handleBottomSettingsClick() {
+      if (!isAdmin) {
+        openAdminModal();
+      } else {
+        switchTab('openlist');
       }
     }
 
@@ -765,6 +915,8 @@
         fetchAppConfig();
         if (currentTab === 'history') {
           loadRecentItems();
+        } else {
+          switchTab('openlist');
         }
       } catch (err) {
         showToast(err.message, true);
@@ -848,12 +1000,12 @@
 
       toastMsg.innerText = msg;
       toastIcon.className = isError 
-        ? "fa-solid fa-circle-exclamation text-rose-400" 
-        : "fa-solid fa-circle-check text-emerald-400";
+        ? 'fa-solid fa-circle-exclamation text-rose-400' 
+        : 'fa-solid fa-circle-check text-emerald-400';
 
-      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.remove('translate-y-24', 'sm:translate-y-20', 'opacity-0');
       setTimeout(() => {
-        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.add('translate-y-24', 'sm:translate-y-20', 'opacity-0');
       }, 3000);
     }
 
@@ -865,23 +1017,47 @@
       }
 
       currentTab = tab;
+
+      // 1. Switch sections & Desktop top nav buttons
       ['text', 'file', 'history', 'openlist'].forEach(t => {
         const sec = document.getElementById(`tab-${t}`);
         if (sec) sec.classList.add('hidden');
+        
+        // Desktop Top Tab Button
         const btn = document.getElementById(`tab-btn-${t}`);
         if (btn) {
           btn.classList.remove('bg-white', 'text-brand-600', 'shadow-sm');
           btn.classList.add('text-slate-600');
         }
+
+        // Mobile Bottom Dock Tab Button
+        const bottomBtn = document.getElementById(`tab-bottom-btn-${t}`);
+        if (bottomBtn) {
+          bottomBtn.classList.remove('text-brand-600', 'bg-brand-50/90', 'font-bold');
+          bottomBtn.classList.add('text-slate-500', 'font-medium');
+        }
       });
 
+      // 2. Activate Current Section
       const currentSec = document.getElementById(`tab-${tab}`);
       if (currentSec) currentSec.classList.remove('hidden');
+
+      // 3. Highlight Desktop Button
       const activeBtn = document.getElementById(`tab-btn-${tab}`);
       if (activeBtn) {
         activeBtn.classList.add('bg-white', 'text-brand-600', 'shadow-sm');
         activeBtn.classList.remove('text-slate-600');
       }
+
+      // 4. Highlight Mobile Bottom Dock Button
+      const activeBottomBtn = document.getElementById(`tab-bottom-btn-${tab}`);
+      if (activeBottomBtn) {
+        activeBottomBtn.classList.add('text-brand-600', 'bg-brand-50/90', 'font-bold');
+        activeBottomBtn.classList.remove('text-slate-500', 'font-medium');
+      }
+
+      // 5. Scroll to top smoothly on mobile
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       if (tab === 'history') {
         loadRecentItems();
@@ -964,7 +1140,7 @@
     }
 
     function formatBytes(bytes) {
-      if (bytes === 0) return '0 B';
+      if (!bytes || bytes === 0) return '0 B';
       const k = 1024;
       const sizes = ['B', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -1016,7 +1192,7 @@
         showToast(err.message, true);
       } finally {
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-bolt"></i> 生成 6 位取件码与二维码';
+        btn.innerHTML = '<i class="fa-solid fa-bolt text-amber-300"></i> 生成 6 位取件码与二维码';
       }
     }
 
@@ -1178,7 +1354,9 @@
     }
 
     function handleQuickPickup() {
-      const code = document.getElementById('quickCodeInput').value.trim();
+      const mobileInput = document.getElementById('quickCodeInputMobile');
+      const desktopInput = document.getElementById('quickCodeInput');
+      const code = (mobileInput?.value || desktopInput?.value || '').trim();
       if (!code) {
         showToast('请输入提取码', true);
         return;
@@ -1207,7 +1385,7 @@
 
     function copySpecificShareLink(url, code) {
       navigator.clipboard.writeText(url);
-      showToast(`口令 #${code} 的网页提取链接已复制！`);
+      showToast(`口令 #${code} 的提取链接已复制！`);
     }
 
     function renderHistoryList() {
@@ -1233,9 +1411,9 @@
       // Update badge count
       if (badge) {
         if (isAdmin) {
-          badge.innerHTML = `<i class="fa-solid fa-crown text-amber-500 mr-1"></i>全站所有用户中转记录 (共 ${cachedHistoryItems.length} 条)`;
+          badge.innerHTML = `<i class="fa-solid fa-crown text-amber-500 mr-1"></i>全站记录 (${cachedHistoryItems.length}条)`;
         } else {
-          badge.innerText = `仅本设备上传记录 (共 ${cachedHistoryItems.length} 条)`;
+          badge.innerText = `仅本设备记录 (${cachedHistoryItems.length}条)`;
         }
       }
 
@@ -1279,62 +1457,60 @@
 
         let syncBadge = '';
         if (item.openlist_sync_status === 'synced') {
-          syncBadge = '<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium text-[11px]"><i class="fa-solid fa-check"></i> 已同步网盘</span>';
+          syncBadge = '<span class="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium text-[11px] whitespace-nowrap"><i class="fa-solid fa-check"></i> 已同步</span>';
         } else if (item.openlist_sync_status === 'pending') {
-          syncBadge = '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium text-[11px]"><i class="fa-solid fa-rotate fa-spin"></i> 同步中</span>';
+          syncBadge = '<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium text-[11px] whitespace-nowrap"><i class="fa-solid fa-rotate fa-spin"></i> 同步中</span>';
         } else if (item.openlist_sync_status === 'failed') {
-          syncBadge = `<button onclick="retrySync('${item.code}')" class="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-medium text-[11px] hover:bg-rose-100" title="${item.openlist_sync_error || ''}"><i class="fa-solid fa-triangle-exclamation"></i> 同步重试</button>`;
-        } else {
-          syncBadge = '<span class="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-medium text-[11px]">未配置同步</span>';
+          syncBadge = `<button onclick="retrySync('${item.code}')" class="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 font-medium text-[11px] hover:bg-rose-100 whitespace-nowrap" title="${item.openlist_sync_error || ''}"><i class="fa-solid fa-triangle-exclamation"></i> 重试</button>`;
         }
 
         return `
-          <div class="bg-white p-4 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 hover:shadow-md transition-all">
-            <div class="flex items-center gap-3 overflow-hidden">
-              <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-lg flex-shrink-0">
+          <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 hover:shadow-md transition-all">
+            <div class="flex items-center gap-3 overflow-hidden w-full sm:w-auto">
+              <div class="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-base sm:text-lg flex-shrink-0 shadow-xs">
                 ${typeIcon}
               </div>
-              <div class="overflow-hidden">
-                <div class="flex items-center gap-2">
+              <div class="overflow-hidden flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
                   <span class="font-mono font-black text-slate-800 text-sm tracking-wider">#${item.code}</span>
-                  <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${typeBadgeColor}">${typeLabel}</span>
-                  <span class="text-xs font-bold text-slate-700 truncate max-w-[150px] sm:max-w-xs" title="${item.title || item.code}">${item.title || item.code}</span>
+                  <span class="px-1.5 py-0.2 rounded text-[10px] font-bold ${typeBadgeColor}">${typeLabel}</span>
+                  <span class="text-xs font-bold text-slate-700 truncate max-w-[160px] sm:max-w-xs" title="${item.title || item.code}">${item.title || item.code}</span>
                 </div>
-                <div class="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                <div class="flex items-center gap-1.5 mt-0.5 text-[10px] sm:text-[11px] text-slate-400 flex-wrap">
                   <span>${formatBytes(item.file_size)}</span>
                   <span>•</span>
-                  <span>${item.created_at.slice(0, 16).replace('T', ' ')}</span>
+                  <span>${item.created_at.slice(5, 16).replace('T', ' ')}</span>
                   <span>•</span>
-                  <span>${item.burn_after_reading ? '<span class="text-rose-600 font-bold">阅后即焚</span>' : (item.expires_at ? '到期自动清理' : '永久')}</span>
+                  <span>${item.burn_after_reading ? '<span class="text-rose-600 font-bold">阅后即焚</span>' : (item.expires_at ? '定时销毁' : '永久')}</span>
                 </div>
               </div>
             </div>
 
-            <div class="flex items-center gap-1.5 self-end sm:self-center">
+            <div class="flex items-center gap-1 self-end sm:self-center border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 w-full sm:w-auto justify-end">
               ${syncBadge}
               
               <!-- Copy Share Link -->
-              <button onclick="copySpecificShareLink('${item.share_url}', '${item.code}')" class="p-2 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 text-xs transition-all" title="复制提取网页链接">
+              <button onclick="copySpecificShareLink('${item.share_url}', '${item.code}')" class="p-2 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 text-xs active:scale-90 transition-all" title="复制提取链接">
                 <i class="fa-regular fa-copy text-sm"></i>
               </button>
 
-              <!-- Open Share Page in New Tab -->
-              <a href="${item.share_url}" target="_blank" class="p-2 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 text-xs transition-all" title="在新标签页打开提取页">
+              <!-- Open Share Page -->
+              <a href="${item.share_url}" target="_blank" class="p-2 text-slate-400 hover:text-purple-600 rounded-lg hover:bg-purple-50 text-xs active:scale-90 transition-all" title="打开取件页">
                 <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
               </a>
 
               <!-- Download / View Raw -->
-              <a href="${item.raw_url}" ${item.type !== 'text' ? 'download' : ''} target="_blank" class="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 text-xs transition-all" title="${item.type === 'text' ? '查看纯文本内容' : '直接下载文件'}">
+              <a href="${item.raw_url}" ${item.type !== 'text' ? 'download' : ''} target="_blank" class="p-2 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 text-xs active:scale-90 transition-all" title="${item.type === 'text' ? '查看纯文本' : '直接下载'}">
                 <i class="fa-solid ${item.type === 'text' ? 'fa-align-left' : 'fa-download'} text-sm"></i>
               </a>
 
               <!-- QR Code Modal -->
-              <button onclick="viewItemQr('${item.code}')" class="p-2 text-slate-400 hover:text-brand-600 rounded-lg hover:bg-brand-50 text-xs transition-all" title="查看二维码与口令">
+              <button onclick="viewItemQr('${item.code}')" class="p-2 text-slate-400 hover:text-brand-600 rounded-lg hover:bg-brand-50 text-xs active:scale-90 transition-all" title="查看二维码">
                 <i class="fa-solid fa-qrcode text-sm"></i>
               </button>
 
               <!-- Delete -->
-              <button onclick="deleteItem('${item.code}')" class="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 text-xs transition-all" title="删除">
+              <button onclick="deleteItem('${item.code}')" class="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 text-xs active:scale-90 transition-all" title="删除">
                 <i class="fa-regular fa-trash-can text-sm"></i>
               </button>
             </div>
@@ -1520,7 +1696,7 @@
           list.innerHTML = data.mounts.map(m => `
             <button 
               onclick="selectMountTarget('${m.path}')"
-              class="px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 font-mono font-bold rounded-xl border border-brand-200 transition-all flex items-center gap-1.5"
+              class="px-3 py-1.5 bg-brand-50 hover:bg-brand-100 text-brand-700 font-mono font-bold rounded-xl border border-brand-200 transition-all flex items-center gap-1.5 active:scale-95 text-xs"
             >
               <i class="fa-solid fa-folder-closed text-xs"></i>
               <span>${m.path}</span>

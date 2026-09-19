@@ -63,7 +63,8 @@ async def index_view():
     return HTMLResponse(index_file.read_text(encoding="utf-8"))
 
 @app.get("/s/{code}", response_class=HTMLResponse)
-async def share_view(code: str):
+@app.get("/share", response_class=HTMLResponse)
+async def share_view(code: str = ""):
     share_file = frontend_dir / "share.html"
     if not share_file.exists():
         return HTMLResponse("<h1>QR-Relay 页面加载失败</h1>")

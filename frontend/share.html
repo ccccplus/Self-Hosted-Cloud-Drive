@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#f8fafc" />
   <title>提取中转内容 | QR-Relay</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -23,104 +26,141 @@
       }
     }
   </script>
+  <style>
+    :root {
+      --sat: env(safe-area-inset-top, 0px);
+      --sab: env(safe-area-inset-bottom, 0px);
+    }
+    html, body {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    body {
+      padding-top: max(0.75rem, var(--sat));
+      padding-bottom: max(1.25rem, var(--sab));
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+  </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 min-h-screen text-slate-800 font-sans antialiased flex flex-col justify-between">
+<body class="bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 min-h-screen text-slate-800 font-sans antialiased flex flex-col justify-between px-3 sm:px-4">
 
-  <!-- Header -->
-  <header class="max-w-xl mx-auto w-full px-4 pt-6 pb-2 flex items-center justify-between">
-    <a href="/" class="flex items-center gap-2">
-      <div class="w-8 h-8 bg-brand-600 rounded-xl flex items-center justify-center text-white text-sm shadow-md">
+  <!-- Top App Bar / Header -->
+  <header class="max-w-lg mx-auto w-full pt-2 pb-3 flex items-center justify-between">
+    <a href="/" class="flex items-center gap-2.5 active:scale-95 transition-all">
+      <div class="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-tr from-brand-600 to-purple-600 rounded-xl flex items-center justify-center text-white text-sm shadow-md shadow-brand-500/20">
         <i class="fa-solid fa-qrcode"></i>
       </div>
-      <span class="font-black text-slate-900 tracking-tight">QR-Relay</span>
+      <div>
+        <span class="font-black text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">QR-Relay</span>
+        <span class="text-[10px] text-slate-400 font-medium hidden sm:block">临时云盘与中转站</span>
+      </div>
     </a>
-    <a href="/" class="text-xs text-brand-600 font-bold hover:underline flex items-center gap-1">
-      <i class="fa-solid fa-plus"></i> 我也要传
+    <a 
+      href="/" 
+      class="px-3 py-1.5 rounded-xl bg-white/80 border border-slate-200/80 text-xs text-brand-600 font-bold hover:bg-brand-50 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
+    >
+      <i class="fa-solid fa-paper-plane text-xs"></i>
+      <span>我也要快传</span>
     </a>
   </header>
 
-  <!-- Main Content Card -->
-  <main class="max-w-xl mx-auto w-full px-4 py-4 my-auto">
-    <div id="loadingCard" class="bg-white/90 backdrop-blur-md rounded-3xl p-8 border border-white shadow-xl text-center">
-      <i class="fa-solid fa-circle-notch fa-spin text-2xl text-brand-600 mb-3"></i>
-      <p class="text-sm font-semibold text-slate-600">正在获取中转内容...</p>
+  <!-- Main Content Area -->
+  <main class="max-w-lg mx-auto w-full my-auto py-2">
+    <!-- Loading State Card -->
+    <div id="loadingCard" class="glass-card rounded-3xl p-8 border border-white/80 shadow-xl shadow-slate-200/50 text-center">
+      <div class="w-12 h-12 rounded-2xl bg-brand-50 text-brand-600 mx-auto flex items-center justify-center text-xl mb-3 shadow-inner">
+        <i class="fa-solid fa-circle-notch fa-spin"></i>
+      </div>
+      <p class="text-sm font-bold text-slate-700">正在检索提取中转内容...</p>
+      <p class="text-xs text-slate-400 mt-1">口令校验与解密中</p>
     </div>
 
-    <!-- Error Card -->
-    <div id="errorCard" class="hidden bg-white/90 backdrop-blur-md rounded-3xl p-8 border border-white shadow-xl text-center">
-      <div class="w-16 h-16 rounded-2xl bg-rose-50 text-rose-500 mx-auto flex items-center justify-center text-2xl mb-4">
+    <!-- Error State Card -->
+    <div id="errorCard" class="hidden glass-card rounded-3xl p-7 border border-white/80 shadow-xl shadow-slate-200/50 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-rose-50 text-rose-500 mx-auto flex items-center justify-center text-2xl mb-3 shadow-inner">
         <i class="fa-solid fa-triangle-exclamation"></i>
       </div>
-      <h2 class="text-base font-bold text-slate-800 mb-2">无法提取内容</h2>
-      <p id="errorMsg" class="text-xs text-slate-500 mb-6">提取码不存在，或该内容已超过有效期被系统清理</p>
-      <a href="/" class="inline-block px-5 py-2.5 bg-slate-900 text-white text-xs font-semibold rounded-xl shadow">
-        返回中转站首页
+      <h2 class="text-base font-bold text-slate-800 mb-1">无法提取该内容</h2>
+      <p id="errorMsg" class="text-xs text-slate-500 mb-5 leading-relaxed px-2">提取码不存在，或该内容已超过设定有效期被系统彻底销毁清理</p>
+      <a 
+        href="/" 
+        class="inline-flex items-center justify-center gap-1.5 w-full py-3 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-md active:scale-98 transition-all"
+      >
+        <i class="fa-solid fa-arrow-left text-xs"></i>
+        <span>返回中转站首页</span>
       </a>
     </div>
 
     <!-- Success Content Card -->
-    <div id="contentCard" class="hidden bg-white/90 backdrop-blur-md rounded-3xl p-6 sm:p-8 border border-white shadow-2xl">
+    <div id="contentCard" class="hidden glass-card rounded-3xl p-5 sm:p-7 border border-white/80 shadow-2xl shadow-slate-200/60 transition-all">
       
-      <!-- Top Meta -->
-      <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-        <div class="flex items-center gap-2">
+      <!-- Top Meta / Badges -->
+      <div class="flex items-center justify-between gap-2 mb-4 pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2 flex-wrap">
           <span id="badgeType" class="px-2.5 py-1 rounded-lg bg-brand-50 text-brand-700 font-bold text-xs">
-            文本
+            文字
           </span>
-          <span id="badgeBurn" class="hidden px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-xs">
-            <i class="fa-solid fa-fire"></i> 阅后即焚已销毁
+          <span id="badgeBurn" class="hidden px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-xs flex items-center gap-1">
+            <i class="fa-solid fa-fire text-xs"></i> 阅后即焚已销毁
           </span>
         </div>
         <div class="text-[11px] text-slate-400 font-mono" id="itemMetaTime">
-          2026-09-19 02:30
+          提取中...
         </div>
       </div>
 
-      <!-- Text Content Display -->
+      <!-- Text Section -->
       <div id="textSection" class="hidden space-y-4">
-        <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 max-h-[50vh] overflow-y-auto">
-          <pre id="textContent" class="whitespace-pre-wrap break-words text-sm text-slate-800 font-mono font-normal"></pre>
+        <div class="relative bg-slate-50/90 rounded-2xl border border-slate-200/80 p-4 max-h-[52vh] overflow-y-auto">
+          <pre id="textContent" class="whitespace-pre-wrap break-words text-sm text-slate-800 font-mono font-normal leading-relaxed select-all"></pre>
         </div>
         <button 
           onclick="copyTextContent()" 
           id="btnCopyText"
-          class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2"
+          class="w-full py-3.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2"
         >
-          <i class="fa-regular fa-copy"></i> 一键复制文字
+          <i class="fa-regular fa-copy"></i>
+          <span>一键复制文字内容</span>
         </button>
       </div>
 
-      <!-- Image Display -->
+      <!-- Image Section -->
       <div id="imageSection" class="hidden space-y-4 text-center">
-        <div class="rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 max-h-[60vh] flex items-center justify-center">
-          <img id="imagePreview" src="" alt="预览图" class="max-h-[60vh] w-auto object-contain mx-auto" />
+        <div class="rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-100/60 max-h-[55vh] flex items-center justify-center p-1">
+          <img id="imagePreview" src="" alt="预览图" class="max-h-[53vh] w-auto max-w-full rounded-xl object-contain mx-auto shadow-sm" />
         </div>
         <a 
           id="btnDownloadImage" 
           href="#" 
           download 
-          class="block w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
+          class="block w-full py-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
         >
-          <i class="fa-solid fa-download"></i> 保存原图
+          <i class="fa-solid fa-download"></i>
+          <span>保存原图到本地</span>
         </a>
       </div>
 
-      <!-- File Display -->
+      <!-- File Section -->
       <div id="fileSection" class="hidden space-y-5 text-center">
-        <div class="py-4">
+        <div class="py-5 px-3 bg-slate-50/70 rounded-2xl border border-slate-200/60">
           <div class="w-16 h-16 rounded-2xl bg-indigo-50 text-brand-600 mx-auto flex items-center justify-center text-3xl mb-3 shadow-inner">
             <i class="fa-solid fa-file-lines"></i>
           </div>
-          <h3 id="fileName" class="text-sm font-bold text-slate-800 break-all px-4">filename.zip</h3>
-          <p id="fileSize" class="text-xs text-slate-400 mt-1">0 KB</p>
+          <h3 id="fileName" class="text-sm sm:text-base font-bold text-slate-800 break-all px-2">filename.zip</h3>
+          <p id="fileSize" class="text-xs text-slate-400 font-mono mt-1">0 KB</p>
         </div>
         <a 
           id="btnDownloadFile" 
           href="#" 
           download 
-          class="block w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2"
+          class="block w-full py-3.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-700 hover:to-indigo-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-lg shadow-brand-500/25 transition-all flex items-center justify-center gap-2"
         >
-          <i class="fa-solid fa-cloud-arrow-down"></i> 立即下载文件
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+          <span>立即高速下载文件</span>
         </a>
       </div>
 
@@ -133,13 +173,16 @@
     </div>
   </main>
 
-  <!-- Footer -->
-  <footer class="max-w-xl mx-auto w-full px-4 py-4 text-center text-xs text-slate-400">
-    QR-Relay · 极简自建临时云盘与二维码中转站
+  <!-- Mobile Footer -->
+  <footer class="max-w-lg mx-auto w-full pt-3 pb-2 text-center text-xs text-slate-400">
+    <p>QR-Relay · 临时云盘与二维码快传中转站</p>
   </footer>
 
-  <!-- Toast Notification -->
-  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+  <!-- Centered Toast Notification for Mobile -->
+  <div 
+    id="toast" 
+    class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl text-xs font-semibold shadow-2xl flex items-center gap-2 transform translate-y-24 opacity-0 pointer-events-none transition-all duration-300 z-50 whitespace-nowrap"
+  >
     <i class="fa-solid fa-circle-check text-emerald-400"></i>
     <span id="toastMsg">已复制</span>
   </div>
@@ -173,7 +216,7 @@
         const res = await fetch(`/api/item/${code}`);
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.detail || '条目不存在或已过期');
+          throw new Error(data.detail || '提取码不存在或已过期销毁');
         }
 
         itemData = data;
@@ -187,7 +230,7 @@
       document.getElementById('loadingCard').classList.add('hidden');
       document.getElementById('contentCard').classList.remove('hidden');
 
-      document.getElementById('itemMetaTime').innerText = `提取码 #${data.code} • ${data.created_at.slice(0, 16).replace('T', ' ')}`;
+      document.getElementById('itemMetaTime').innerText = `口令 #${data.code} • ${data.created_at.slice(0, 16).replace('T', ' ')}`;
 
       if (data.burn_after_reading) {
         document.getElementById('badgeBurn').classList.remove('hidden');
@@ -226,9 +269,9 @@
     function showToast(msg) {
       const toast = document.getElementById('toast');
       document.getElementById('toastMsg').innerText = msg;
-      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.remove('translate-y-24', 'opacity-0');
       setTimeout(() => {
-        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.add('translate-y-24', 'opacity-0');
       }, 2500);
     }
 
