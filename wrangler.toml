@@ -1,0 +1,40 @@
+name = "qr-relay"
+main = "cloudflare/worker.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# -------------------------------------------------------------
+# Static Assets: Automatically hosts frontend/index.html & share.html
+# -------------------------------------------------------------
+[assets]
+directory = "frontend"
+binding = "ASSETS"
+
+# -------------------------------------------------------------
+# Cloudflare D1 (SQLite Database)
+# -------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "qr-relay-db"
+database_id = "qr-relay-db"
+
+# -------------------------------------------------------------
+# Cloudflare R2 (Object Storage for files and images)
+# -------------------------------------------------------------
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "qr-relay-files"
+
+# -------------------------------------------------------------
+# Cron Trigger: Background physical file and DB expiration cleanup
+# -------------------------------------------------------------
+[triggers]
+crons = ["*/10 * * * *"]
+
+# -------------------------------------------------------------
+# Environment Variables & Default Config
+# -------------------------------------------------------------
+[vars]
+APP_NAME = "QR-Relay"
+MAX_FILE_SIZE_MB = "100"
+ADMIN_PASSWORD = "admin123"
