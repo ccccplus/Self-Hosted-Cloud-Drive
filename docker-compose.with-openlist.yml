@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  # OpenList 多网盘聚合挂载服务
+  openlist:
+    image: openlistteam/openlist:latest
+    container_name: openlist
+    restart: unless-stopped
+    ports:
+      - "5244:5244"
+    volumes:
+      - ./openlist_data:/opt/openlist/data
+    environment:
+      - PUID=0
+      - PGID=0
+      - UMASK=022
+
+  # QR-Relay 临时云盘与二维码中转站
+  qr-relay:
+    build: .
+    container_name: qr-relay
+    restart: unless-stopped
+    depends_on:
+      - openlist
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      # 请修改为你的公网 IP 或访问域名
+      - BASE_URL=http://localhost:8080
+      - MAX_FILE_SIZE_MB=100
+      - UPLOAD_PASSWORD=
+      - AUTO_CLEANUP_INTERVAL_SECONDS=60
+      # 内部 Docker 容器网络直接互通，无需暴露公网
+      - OPENLIST_WEBDAV_URL=http://openlist:5244/dav
+      - OPENLIST_USERNAME=admin
+      # 请在 OpenList 启动后，使用 docker exec 获取密码，并填写到此处
+      - OPENLIST_PASSWORD=admin
+      - OPENLIST_BACKUP_PATH=/QR-Relay-Backup
+      - OPENLIST_AUTO_SYNC=True

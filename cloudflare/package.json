@@ -1,0 +1,21 @@
+{
+  "name": "qr-relay-cloudflare",
+  "version": "1.0.0",
+  "description": "QR-Relay on Cloudflare Workers, Pages, D1 (SQLite) and R2 Object Storage",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "d1:init": "wrangler d1 execute qr-relay-db --file=./schema.sql"
+  },
+  "dependencies": {
+    "hono": "^4.6.3",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241022.0",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.80.0"
+  }
+}

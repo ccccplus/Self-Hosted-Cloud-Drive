@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  qr-relay:
+    build: .
+    container_name: qr-relay
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      # 持久化数据库与临时缓存目录
+      - ./data:/app/data
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      # 请修改为你的公网 IP 或访问域名
+      - BASE_URL=http://localhost:8080
+      - MAX_FILE_SIZE_MB=100
+      - UPLOAD_PASSWORD=
+      - AUTO_CLEANUP_INTERVAL_SECONDS=60
+      # 连接已有的 OpenList 服务 (若使用 host 网络或局域网 IP)
+      - OPENLIST_WEBDAV_URL=http://host.docker.internal:5244/dav
+      - OPENLIST_USERNAME=admin
+      - OPENLIST_PASSWORD=your_password
+      - OPENLIST_BACKUP_PATH=/QR-Relay-Backup
+      - OPENLIST_AUTO_SYNC=True
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -1,0 +1,27 @@
+# Python virtual environment & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Local data & uploaded files
+data/
+*.db
+*.sqlite3
+
+# Environment & credentials (keep .env.example)
+.env
+*.local
+
+# Node & Wrangler cache
+node_modules/
+.wrangler/
+dist/
+
+# Operating System & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,50 @@
+name = "qr-relay"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# -------------------------------------------------------------
+# Static Assets: Automatically hosts frontend/index.html & share.html
+# -------------------------------------------------------------
+[assets]
+directory = "../frontend"
+binding = "ASSETS"
+
+# -------------------------------------------------------------
+# Cloudflare D1 (SQLite Database)
+# Create: npx wrangler d1 create qr-relay-db
+# Apply schema: npx wrangler d1 execute qr-relay-db --file=./schema.sql
+# -------------------------------------------------------------
+[[d1_databases]]
+binding = "DB"
+database_name = "qr-relay-db"
+database_id = "YOUR_D1_DATABASE_ID_HERE"
+
+# -------------------------------------------------------------
+# Cloudflare R2 (Object Storage for files and images)
+# Create: npx wrangler r2 bucket create qr-relay-files
+# -------------------------------------------------------------
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "qr-relay-files"
+
+# -------------------------------------------------------------
+# Cron Trigger: Background physical file and DB expiration cleanup
+# -------------------------------------------------------------
+[triggers]
+crons = ["*/10 * * * *"] # Runs every 10 minutes
+
+# -------------------------------------------------------------
+# Environment Variables & Default Config
+# -------------------------------------------------------------
+[vars]
+APP_NAME = "QR-Relay"
+MAX_FILE_SIZE_MB = "100"
+ADMIN_PASSWORD = "admin123"
+
+# Optional OpenList WebDAV integration (uncomment if you have a public OpenList URL or Tunnel)
+# OPENLIST_WEBDAV_URL = "https://your-openlist.yourdomain.com/dav"
+# OPENLIST_USERNAME = "admin"
+# OPENLIST_PASSWORD = "your-password"
+# OPENLIST_BACKUP_PATH = "/QR-Relay-Backup"
+# OPENLIST_AUTO_SYNC = "true"
