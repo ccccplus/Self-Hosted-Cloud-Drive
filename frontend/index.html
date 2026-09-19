@@ -3,9 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  
+  <!-- Web App Manifest & Mobile PWA Settings -->
+  <link rel="manifest" href="/manifest.json" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-  <meta name="theme-color" content="#f8fafc" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="QR-Relay" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="QR-Relay" />
+  <meta name="theme-color" content="#4f46e5" />
+  
   <title>QR-Relay | 临时云盘与二维码中转站</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -100,22 +109,34 @@
         </div>
       </div>
 
-      <!-- Mobile Quick Pickup Pill -->
-      <div class="flex items-center bg-white/90 border border-slate-200 shadow-sm rounded-xl p-1">
-        <input 
-          id="quickCodeInputMobile" 
-          type="text" 
-          placeholder="6位取件码" 
-          maxlength="10"
-          class="w-20 px-2 py-1 text-xs bg-transparent outline-none font-mono font-bold text-slate-800 uppercase placeholder:text-slate-400 placeholder:font-normal"
-          onkeypress="if(event.key === 'Enter') handleQuickPickup()"
-        />
+      <!-- Mobile Quick Actions -->
+      <div class="flex items-center gap-1.5">
         <button 
-          onclick="handleQuickPickup()"
-          class="px-2.5 py-1 text-[11px] bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-lg shadow-sm transition-all"
+          onclick="openPwaModal()" 
+          class="px-2 py-1 text-[11px] text-brand-600 bg-brand-50 hover:bg-brand-100 font-bold rounded-xl border border-brand-200/80 active:scale-95 transition-all flex items-center gap-1 shadow-2xs"
+          title="保存到手机主屏幕作为 App"
         >
-          取件
+          <i class="fa-solid fa-mobile-screen-button text-xs"></i>
+          <span>App</span>
         </button>
+
+        <!-- Mobile Quick Pickup Pill -->
+        <div class="flex items-center bg-white/90 border border-slate-200 shadow-sm rounded-xl p-1">
+          <input 
+            id="quickCodeInputMobile" 
+            type="text" 
+            placeholder="6位取件码" 
+            maxlength="10"
+            class="w-20 px-1.5 py-1 text-xs bg-transparent outline-none font-mono font-bold text-slate-800 uppercase placeholder:text-slate-400 placeholder:font-normal"
+            onkeypress="if(event.key === 'Enter') handleQuickPickup()"
+          />
+          <button 
+            onclick="handleQuickPickup()"
+            class="px-2.5 py-1 text-[11px] bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold rounded-lg shadow-sm transition-all"
+          >
+            取件
+          </button>
+        </div>
       </div>
     </header>
 
@@ -591,32 +612,49 @@
       </div>
     </section>
 
-    <!-- Desktop Footer & Admin Entry -->
-    <footer class="mt-8 pt-6 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-      <div class="flex items-center gap-2">
-        <span>QR-Relay · 临时云盘与二维码中转站</span>
-        <span class="text-slate-300">|</span>
-        <span id="roleIndicator" class="text-slate-500 font-medium">访客模式</span>
+    <!-- Desktop & Mobile Footer with Disclaimer & PWA Entry -->
+    <footer class="mt-8 pt-6 border-t border-slate-200/70 text-xs text-slate-400 space-y-2.5">
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
+          <span class="font-semibold text-slate-700">QR-Relay</span>
+          <span class="text-slate-300">|</span>
+          <span id="roleIndicator" class="text-slate-500 font-medium">访客模式</span>
+          <span class="text-slate-300">|</span>
+          <button onclick="openPwaModal()" class="text-brand-600 hover:text-brand-700 font-semibold hover:underline flex items-center gap-1 active:scale-95 transition-all">
+            <i class="fa-solid fa-mobile-screen-button text-xs"></i>
+            <span>保存为桌面 App</span>
+          </button>
+          <span class="text-slate-300">|</span>
+          <button onclick="openDisclaimerModal()" class="text-rose-500 hover:text-rose-600 font-semibold hover:underline flex items-center gap-1 active:scale-95 transition-all">
+            <i class="fa-solid fa-shield-halved text-xs"></i>
+            <span>免责声明与风险告知</span>
+          </button>
+        </div>
+
+        <!-- Admin Entry Button at bottom -->
+        <div id="adminFooterEntry">
+          <button 
+            onclick="openAdminModal()" 
+            id="btnAdminLoginTrigger"
+            class="text-slate-400 hover:text-purple-600 font-medium transition-all flex items-center gap-1.5 py-1 px-2.5 rounded-lg hover:bg-purple-50 active:scale-95"
+          >
+            <i class="fa-solid fa-lock text-[11px]"></i>
+            <span>管理员入口</span>
+          </button>
+          <button 
+            onclick="adminLogout()" 
+            id="btnAdminLogoutTrigger"
+            class="hidden text-purple-600 hover:text-purple-800 font-semibold transition-all flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-purple-50 hover:bg-purple-100 active:scale-95"
+          >
+            <i class="fa-solid fa-crown text-[11px] text-amber-500"></i>
+            <span>管理员模式已启用 (退出)</span>
+          </button>
+        </div>
       </div>
 
-      <!-- Admin Entry Button at bottom -->
-      <div id="adminFooterEntry">
-        <button 
-          onclick="openAdminModal()" 
-          id="btnAdminLoginTrigger"
-          class="text-slate-400 hover:text-purple-600 font-medium transition-all flex items-center gap-1.5 py-1 px-2.5 rounded-lg hover:bg-purple-50"
-        >
-          <i class="fa-solid fa-lock text-[11px]"></i>
-          <span>管理员入口</span>
-        </button>
-        <button 
-          onclick="adminLogout()" 
-          id="btnAdminLogoutTrigger"
-          class="hidden text-purple-600 hover:text-purple-800 font-semibold transition-all flex items-center gap-1.5 py-1 px-2.5 rounded-lg bg-purple-50 hover:bg-purple-100"
-        >
-          <i class="fa-solid fa-crown text-[11px] text-amber-500"></i>
-          <span>管理员模式已启用 (退出)</span>
-        </button>
+      <!-- Legal Caution Note -->
+      <div class="text-[11px] text-slate-400 leading-relaxed text-center sm:text-left bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/50">
+        <p>⚠️ <strong>合规与风险警示</strong>：本系统仅限个人非商业性技术学习与私有局域网传输自用，严禁商用盈利或公共非法分发！严禁传输涉及国家秘密、个人高敏隐私、金融账密或任何违背法律法规的内容。使用者对数据及用途负全部法律责任。</p>
       </div>
     </footer>
 
@@ -747,6 +785,139 @@
     </div>
   </div>
 
+  <!-- PWA Web App Guide Modal -->
+  <div id="pwaModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 transform transition-all max-h-[92vh] overflow-y-auto text-left">
+      <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center text-sm font-bold shadow-2xs">
+            <i class="fa-solid fa-mobile-screen-button"></i>
+          </div>
+          <div>
+            <span class="text-sm font-black text-slate-900 block leading-tight">添加到手机主屏幕</span>
+            <span class="text-[10px] text-slate-400">获得原生 Web App 沉浸全屏体验</span>
+          </div>
+        </div>
+        <button onclick="closePwaModal()" class="text-slate-400 hover:text-slate-600 p-1 active:scale-90">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 text-xs text-slate-600">
+        <p class="leading-relaxed">
+          将 QR-Relay 保存到手机桌面后，可作为<strong>独立 Web App</strong> 打开，无浏览器顶部网址栏与底部工具条，全屏沉浸，启动更快！
+        </p>
+
+        <!-- iOS Guide -->
+        <div class="bg-indigo-50/70 p-3.5 rounded-2xl border border-indigo-100/80">
+          <div class="flex items-center gap-2 font-bold text-brand-800 mb-1.5 text-xs">
+            <i class="fa-brands fa-apple text-base"></i>
+            <span>iPhone / iPad (Safari 浏览器)</span>
+          </div>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-700 leading-relaxed text-[11px]">
+            <li>轻触屏幕底部中间的 <strong>分享图标</strong>（<i class="fa-solid fa-arrow-up-from-bracket text-[10px] text-brand-600"></i>）；</li>
+            <li>向上滑动选项列表，点击 <strong>「添加到主屏幕」</strong>；</li>
+            <li>点击右上角 <strong>「添加」</strong> 即可在桌面生成 App 图标！</li>
+          </ol>
+        </div>
+
+        <!-- Android Guide -->
+        <div class="bg-emerald-50/70 p-3.5 rounded-2xl border border-emerald-100/80">
+          <div class="flex items-center gap-2 font-bold text-emerald-800 mb-1.5 text-xs">
+            <i class="fa-brands fa-android text-base"></i>
+            <span>Android 安卓手机 (Chrome / 浏览器)</span>
+          </div>
+          <ol class="list-decimal list-inside space-y-1.5 text-slate-700 leading-relaxed text-[11px]">
+            <li>轻触浏览器右上角 <strong>更多菜单</strong>（<i class="fa-solid fa-ellipsis-vertical text-[10px] text-emerald-600"></i>）；</li>
+            <li>在菜单中点击 <strong>「安装应用」</strong> 或 <strong>「添加到主屏幕」</strong>；</li>
+            <li>确认添加即可在桌面生成图标。</li>
+          </ol>
+        </div>
+
+        <p class="text-[10px] text-slate-400 leading-relaxed">💡 提示：若在微信中打开，请先点击右上角选择「在默认浏览器中打开」，再按上述步骤添加到主屏幕。</p>
+      </div>
+
+      <div class="pt-3">
+        <button 
+          onclick="closePwaModal()"
+          class="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow active:scale-95 transition-all text-center"
+        >
+          我知道了
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Disclaimer & Risk Disclosure Modal -->
+  <div id="disclaimerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl border border-slate-100 transform transition-all max-h-[88vh] overflow-y-auto text-left">
+      <div class="flex justify-between items-center mb-3 pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-2 text-rose-600 font-black text-sm sm:text-base">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <span>免责声明与风险告知书</span>
+        </div>
+        <button onclick="closeDisclaimerModal()" class="text-slate-400 hover:text-slate-600 p-1 active:scale-90">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3.5 text-xs text-slate-600 leading-relaxed">
+        <div class="p-3 bg-rose-50 rounded-2xl border border-rose-100 text-rose-800 text-xs font-semibold">
+          重要须知：使用或部署本项目，即视为您已完全阅读、充分理解并无保留地接受以下全部合规与免责条款。如您不同意，请立即停止使用并删除相关代码。
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            1. 仅限个人使用 · 严禁商业用途
+          </h4>
+          <p class="text-[11px] text-slate-500 pl-3">
+            本项目属于开源技术研究与个人网络工具，<strong>仅供个人学习、技术探讨及私有家庭/办公局域网临时快传自用。严禁将本项目直接或间接用于任何商业运营、营利性收费服务、广告变现、非法中转站或向公众提供大规模公用存储分发服务。</strong>
+          </p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            2. 数据安全与隐私泄露风险提示
+          </h4>
+          <p class="text-[11px] text-slate-500 pl-3">
+            本项目采用 6 位口令快传机制，在公网部署且未加设强鉴权的环境下，客观存在提取码被穷举扫描、撞库或被中间人恶意窃取的潜在风险。<strong>严禁传输任何高敏感个人隐私（身份证、护照、生物识别）、企业核心机密、财务账密、密码证书或国家涉密档案！</strong>因使用者自行部署配置失误、口令过于简单或服务器遭受黑客攻击所引发的数据损毁、泄露或灭失，本项目开发者不承担任何责任。
+          </p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+            3. 网络法律合规与零容忍原则
+          </h4>
+          <p class="text-[11px] text-slate-500 pl-3">
+            使用者与服务器运营者必须严格遵守所在国家或地区的宪法、互联网安全法规及监管政策。<strong>严禁利用本项目传输、存储、中转或散播任何侵犯他人知识产权、淫秽色情、赌博洗钱、电信诈骗、暴力恐怖、虚假有害信息、恶意木马病毒勒索软件等违法违规内容。</strong>任何因使用者滥用本项目导致的民事侵权赔偿、行政处罚或刑事责任，均由使用者与部署者承担全部责任，与本项目作者没有任何连带关系！
+          </p>
+        </div>
+
+        <div>
+          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            4. 软件按现状提供 (AS IS)
+          </h4>
+          <p class="text-[11px] text-slate-500 pl-3">
+            本软件按“现状”提供，原作者不提供任何明示或暗示的保证（包括但不限于商业适销性、特定用途适用性及无故障保证）。作者亦不对因使用或无法使用本软件所导致的任何直接、间接或附带损失承担责任。
+          </p>
+        </div>
+      </div>
+
+      <div class="pt-4 mt-3 border-t border-slate-100 flex justify-end">
+        <button 
+          onclick="closeDisclaimerModal()"
+          class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow active:scale-95 transition-all"
+        >
+          我已充分知悉风险并同意遵守
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Centered / Bottom Floating Toast Notification -->
   <div 
     id="toast" 
@@ -766,11 +937,47 @@
 
     // Initialize
     window.addEventListener('DOMContentLoaded', async () => {
+      initPwaServiceWorker();
+      detectStandaloneMode();
       await checkAdminStatus();
       fetchAppConfig();
       setupPasteListener();
       setupDragDrop();
     });
+
+    // --- PWA & Standalone Web App Handlers ---
+    function initPwaServiceWorker() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      }
+    }
+
+    function detectStandaloneMode() {
+      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+      if (isStandalone) {
+        document.body.classList.add('standalone-app');
+      }
+    }
+
+    function openPwaModal() {
+      const modal = document.getElementById('pwaModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closePwaModal() {
+      const modal = document.getElementById('pwaModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function openDisclaimerModal() {
+      const modal = document.getElementById('disclaimerModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeDisclaimerModal() {
+      const modal = document.getElementById('disclaimerModal');
+      if (modal) modal.classList.add('hidden');
+    }
 
     // --- Visitor Upload Code Storage (Local Device Isolation) ---
     function getMyUploadedCodes() {

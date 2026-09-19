@@ -70,6 +70,44 @@ async def share_view(code: str = ""):
         return HTMLResponse("<h1>QR-Relay 页面加载失败</h1>")
     return HTMLResponse(share_file.read_text(encoding="utf-8"))
 
+# --- PWA Web App Assets ---
+
+@app.get("/manifest.json")
+async def manifest_view():
+    file = frontend_dir / "manifest.json"
+    if file.exists():
+        return FileResponse(file, media_type="application/manifest+json")
+    raise HTTPException(status_code=404, detail="Manifest not found")
+
+@app.get("/sw.js")
+async def sw_view():
+    file = frontend_dir / "sw.js"
+    if file.exists():
+        return FileResponse(file, media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="Service worker not found")
+
+@app.get("/icon-192.png")
+async def icon_192_view():
+    file = frontend_dir / "icon-192.png"
+    if file.exists():
+        return FileResponse(file, media_type="image/png")
+    raise HTTPException(status_code=404)
+
+@app.get("/icon-512.png")
+async def icon_512_view():
+    file = frontend_dir / "icon-512.png"
+    if file.exists():
+        return FileResponse(file, media_type="image/png")
+    raise HTTPException(status_code=404)
+
+@app.get("/apple-touch-icon.png")
+@app.get("/icon.png")
+async def apple_touch_icon_view():
+    file = frontend_dir / "apple-touch-icon.png"
+    if file.exists():
+        return FileResponse(file, media_type="image/png")
+    raise HTTPException(status_code=404)
+
 # --- Raw File & QR Endpoints ---
 
 @app.get("/api/qrcode")
