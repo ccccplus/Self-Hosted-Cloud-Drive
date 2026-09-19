@@ -103,16 +103,41 @@ async function revokeAdminToken(db, token) {
   } catch {}
 }
 
+// 获取 OpenList 配置（优先数据库 system_settings，兜底环境变量）
+async function getOpenListConfig(db, env) {
+  let url = env.OPENLIST_WEBDAV_URL || '';
+  let username = env.OPENLIST_USERNAME || '';
+  let password = env.OPENLIST_PASSWORD || '';
+  let backupPath = env.OPENLIST_BACKUP_PATH || '/QR-Relay-Backup';
+
+  if (db) {
+    try {
+      const { results } = await db.prepare(
+        "SELECT key, value FROM system_settings WHERE key IN ('openlist_webdav_url', 'openlist_username', 'openlist_password', 'openlist_backup_path')"
+      ).all();
+      for (const r of (results || [])) {
+        if (r.key === 'openlist_webdav_url' && r.value) url = r.value;
+        if (r.key === 'openlist_username' && r.value) username = r.value;
+        if (r.key === 'openlist_password' && r.value) password = r.value;
+        if (r.key === 'openlist_backup_path' && r.value) backupPath = r.value;
+      }
+    } catch {}
+  }
+  return { url, username, password, backupPath };
+}
+
 // OpenList WebDAV 异步同步
 async function syncItemToOpenList(env, item, fileBytes) {
   env.DB = env.DB || env['qr-relay-db'] || env.DATABASE || env.d1;
   env.BUCKET = env.BUCKET || env['qr-relay-files'] || env.STORAGE || env.r2;
-  if (!env.OPENLIST_WEBDAV_URL || !env.DB) return;
-  const baseUrl = env.OPENLIST_WEBDAV_URL.replace(/\/+$/, '');
-  const backupDir = (env.OPENLIST_BACKUP_PATH || '/QR-Relay-Backup').replace(/\/+$/, '');
+  if (!env.DB) return;
+  const cfg = await getOpenListConfig(env.DB, env);
+  if (!cfg.url) return;
+  const baseUrl = cfg.url.replace(/\/+$/, '');
+  const backupDir = (cfg.backupPath || '/QR-Relay-Backup').replace(/\/+$/, '');
   const authHeaders = {};
-  if (env.OPENLIST_USERNAME && env.OPENLIST_PASSWORD) {
-    authHeaders['Authorization'] = `Basic ${btoa(`${env.OPENLIST_USERNAME}:${env.OPENLIST_PASSWORD}`)}`;
+  if (cfg.username && cfg.password) {
+    authHeaders['Authorization'] = `Basic ${btoa(`${cfg.username}:${cfg.password}`)}`;
   }
 
   try {
@@ -258,12 +283,15 @@ export default {
     if (path === '/api/config' && method === 'GET') {
       const token = request.headers.get('X-Admin-Token');
       const isAdmin = await verifyAdminToken(env.DB, token);
+      const cfg = await getOpenListConfig(env.DB, env);
       return jsonResponse({
         app_name: env.APP_NAME || "QR-Relay",
         max_file_size_mb: parseInt(env.MAX_FILE_SIZE_MB || "100"),
         require_password: false,
-        openlist_configured: Boolean(env.OPENLIST_WEBDAV_URL),
-        openlist_backup_path: isAdmin ? (env.OPENLIST_BACKUP_PATH || "/QR-Relay-Backup") : null,
+        openlist_configured: Boolean(cfg.url),
+        openlist_webdav_url: isAdmin ? cfg.url : null,
+        openlist_username: isAdmin ? cfg.username : null,
+        openlist_backup_path: isAdmin ? cfg.backupPath : null,
         openlist_auto_sync: (env.OPENLIST_AUTO_SYNC || "true").toLowerCase() === "true",
         is_admin: isAdmin
       });
@@ -310,7 +338,8 @@ export default {
       const now = new Date();
       const expiresAt = expireSeconds > 0 ? new Date(now.getTime() + expireSeconds * 1000).toISOString() : null;
       const nowIso = now.toISOString();
-      const syncStatus = (syncToOpenList && env.OPENLIST_WEBDAV_URL) ? 'pending' : 'disabled';
+      const openlistCfg = await getOpenListConfig(env.DB, env);
+      const syncStatus = (syncToOpenList && openlistCfg.url) ? 'pending' : 'disabled';
       const itemTitle = title || (text.length > 20 ? text.slice(0, 20) + '...' : text);
 
       await env.DB.prepare(`
@@ -334,7 +363,7 @@ export default {
         burn_after_reading: burnAfterReading, openlist_sync_status: syncStatus
       };
 
-      if (syncToOpenList && env.OPENLIST_WEBDAV_URL && ctx) {
+      if (syncToOpenList && openlistCfg.url && ctx) {
         ctx.waitUntil(syncItemToOpenList(env, item));
       }
 
@@ -377,7 +406,8 @@ export default {
       const now = new Date();
       const expiresAt = expireSeconds > 0 ? new Date(now.getTime() + expireSeconds * 1000).toISOString() : null;
       const nowIso = now.toISOString();
-      const syncStatus = (syncToOpenList && env.OPENLIST_WEBDAV_URL) ? 'pending' : 'disabled';
+      const openlistCfg = await getOpenListConfig(env.DB, env);
+      const syncStatus = (syncToOpenList && openlistCfg.url) ? 'pending' : 'disabled';
 
       const mimeType = file.type || 'application/octet-stream';
       const itemType = mimeType.startsWith('image/') ? 'image' : 'file';
@@ -414,7 +444,7 @@ export default {
         openlist_sync_status: syncStatus
       };
 
-      if (syncToOpenList && env.OPENLIST_WEBDAV_URL && ctx) {
+      if (syncToOpenList && openlistCfg.url && ctx) {
         ctx.waitUntil(syncItemToOpenList(env, item, fileBuffer));
       }
 
@@ -586,17 +616,52 @@ export default {
     }
 
     // --- 路由 14: OpenList 管理接口 ---
+    if (path === '/api/openlist/config' && method === 'POST') {
+      const token = request.headers.get('X-Admin-Token');
+      if (!(await verifyAdminToken(env.DB, token))) return jsonResponse({ detail: "需要管理员权限" }, 403);
+      const formData = await request.formData();
+      const url = (formData.get('url') || '').trim();
+      const username = (formData.get('username') || '').trim();
+      const password = (formData.get('password') || '').trim();
+      let backupPath = (formData.get('backup_path') || '').trim();
+      if (backupPath && !backupPath.startsWith('/')) backupPath = `/${backupPath}`;
+
+      if (url !== undefined) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('openlist_webdav_url', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(url).run();
+      }
+      if (username !== undefined) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('openlist_username', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(username).run();
+      }
+      if (password) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('openlist_password', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(password).run();
+      }
+      if (backupPath) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('openlist_backup_path', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(backupPath).run();
+      }
+
+      return jsonResponse({ success: true, message: "OpenList WebDAV 配置已成功保存！" });
+    }
+
     if (path === '/api/openlist/test' && method === 'POST') {
       const token = request.headers.get('X-Admin-Token');
       if (!(await verifyAdminToken(env.DB, token))) return jsonResponse({ detail: "需要管理员权限" }, 403);
-      if (!env.OPENLIST_WEBDAV_URL) return jsonResponse({ success: false, message: "未配置 OPENLIST_WEBDAV_URL" });
+      const cfg = await getOpenListConfig(env.DB, env);
+      if (!cfg.url) return jsonResponse({ success: false, message: "未配置 OPENLIST_WEBDAV_URL，请在下方填写 WebDAV 服务地址并点击保存" });
 
       try {
         const authHeaders = {};
-        if (env.OPENLIST_USERNAME && env.OPENLIST_PASSWORD) {
-          authHeaders['Authorization'] = `Basic ${btoa(`${env.OPENLIST_USERNAME}:${env.OPENLIST_PASSWORD}`)}`;
+        if (cfg.username && cfg.password) {
+          authHeaders['Authorization'] = `Basic ${btoa(`${cfg.username}:${cfg.password}`)}`;
         }
-        const resp = await fetch(env.OPENLIST_WEBDAV_URL, { method: 'PROPFIND', headers: { ...authHeaders, 'Depth': '0' } });
+        const resp = await fetch(cfg.url, { method: 'PROPFIND', headers: { ...authHeaders, 'Depth': '0' } });
         if (resp.status >= 200 && resp.status < 300 || resp.status === 207) {
           return jsonResponse({ success: true, message: `成功连接至 OpenList WebDAV (HTTP ${resp.status})` });
         }
@@ -609,12 +674,13 @@ export default {
     if (path === '/api/openlist/mounts' && method === 'GET') {
       const token = request.headers.get('X-Admin-Token');
       if (!(await verifyAdminToken(env.DB, token))) return jsonResponse({ detail: "需要管理员权限" }, 403);
-      if (!env.OPENLIST_WEBDAV_URL) return jsonResponse({ success: false, mounts: [], current_backup_path: env.OPENLIST_BACKUP_PATH || "/QR-Relay-Backup" });
+      const cfg = await getOpenListConfig(env.DB, env);
+      if (!cfg.url) return jsonResponse({ success: false, mounts: [], current_backup_path: cfg.backupPath });
 
-      const baseUrl = env.OPENLIST_WEBDAV_URL.replace(/\/+$/, '');
+      const baseUrl = cfg.url.replace(/\/+$/, '');
       const authHeaders = {};
-      if (env.OPENLIST_USERNAME && env.OPENLIST_PASSWORD) {
-        authHeaders['Authorization'] = `Basic ${btoa(`${env.OPENLIST_USERNAME}:${env.OPENLIST_PASSWORD}`)}`;
+      if (cfg.username && cfg.password) {
+        authHeaders['Authorization'] = `Basic ${btoa(`${cfg.username}:${cfg.password}`)}`;
       }
       const mounts = [];
       try {
@@ -629,7 +695,7 @@ export default {
         }
       } catch {}
 
-      return jsonResponse({ success: true, mounts, current_backup_path: env.OPENLIST_BACKUP_PATH || "/QR-Relay-Backup" });
+      return jsonResponse({ success: true, mounts, current_backup_path: cfg.backupPath });
     }
 
     if (path === '/api/openlist/path' && method === 'POST') {
@@ -650,7 +716,8 @@ export default {
       const code = path.replace('/api/item/', '').replace('/sync', '');
       const item = await env.DB.prepare("SELECT * FROM items WHERE code = ?").bind(code).first();
       if (!item) return jsonResponse({ detail: "条目不存在" }, 404);
-      if (!env.OPENLIST_WEBDAV_URL) return jsonResponse({ detail: "未配置 OPENLIST_WEBDAV_URL" }, 400);
+      const cfg = await getOpenListConfig(env.DB, env);
+      if (!cfg.url) return jsonResponse({ detail: "未配置 OPENLIST_WEBDAV_URL" }, 400);
 
       if (ctx) ctx.waitUntil(syncItemToOpenList(env, item));
       return jsonResponse({ success: true, message: `条目 ${code} 正在后台重新同步至 OpenList` });

@@ -402,24 +402,69 @@
             </div>
           </div>
 
-          <!-- Target Backup Path Edit -->
-          <div class="space-y-2 pt-2">
-            <label class="block text-slate-700 font-bold">设置当前归档目标路径：</label>
-            <div class="flex items-center gap-2">
-              <input 
-                type="text" 
-                id="inputBackupPath" 
-                value="/QR-Relay-Backup"
-                placeholder="例如: /aliyun/QR-Relay-Backup"
-                class="flex-1 p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-brand-700 font-bold outline-none focus:border-brand-500 focus:bg-white"
-              />
-              <button 
-                onclick="saveBackupPath()"
-                class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow transition-all"
-              >
-                保存路径
-              </button>
+          <!-- OpenList WebDAV Configuration Form -->
+          <div class="space-y-3 pt-2">
+            <div class="flex items-center justify-between">
+              <label class="block text-slate-800 font-bold text-xs">
+                <i class="fa-solid fa-server text-brand-600"></i> OpenList / AList WebDAV 连接设置：
+              </label>
+              <span class="text-[11px] text-slate-400">（保存后立即生效并测试连接）</span>
             </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-slate-500 text-[11px] font-semibold mb-1">WebDAV 服务地址 (URL)</label>
+                <input 
+                  type="text" 
+                  id="inputWebdavUrl" 
+                  placeholder="例如: http://192.168.1.100:5244/dav 或 https://openlist.yourdomain.com/dav"
+                  class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-brand-500 focus:bg-white transition-all"
+                />
+              </div>
+              <div>
+                <label class="block text-slate-500 text-[11px] font-semibold mb-1">WebDAV 用户名</label>
+                <input 
+                  type="text" 
+                  id="inputWebdavUser" 
+                  placeholder="例如: admin"
+                  class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-brand-500 focus:bg-white transition-all"
+                />
+              </div>
+              <div>
+                <label class="block text-slate-500 text-[11px] font-semibold mb-1">WebDAV 密码</label>
+                <input 
+                  type="password" 
+                  id="inputWebdavPass" 
+                  placeholder="留空则保持原密码不变"
+                  class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-brand-500 focus:bg-white transition-all"
+                />
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-slate-500 text-[11px] font-semibold mb-1">备份归档路径 (网盘中存储位置)</label>
+                <div class="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    id="inputBackupPath" 
+                    value="/QR-Relay-Backup"
+                    placeholder="例如: /aliyun/QR-Relay-Backup"
+                    class="flex-1 p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-brand-700 font-bold outline-none focus:border-brand-500 focus:bg-white transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <button 
+                onclick="saveOpenListConfig()"
+                id="btnSaveOpenList"
+                class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center gap-2"
+              >
+                <i class="fa-solid fa-floppy-disk"></i> 保存 OpenList 配置并测试
+              </button>
+              <span class="text-[11px] text-slate-400">💡 提示：若未部署 OpenList，无需填写此项，文件默认安全存放在 Cloudflare R2 中。</span>
+            </div>
+          </div>
+        </div>
         <!-- Admin Password Change Section in OpenList Tab -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 space-y-3 text-xs">
           <h3 class="font-bold text-slate-800 flex items-center gap-2 text-xs">
@@ -1343,13 +1388,60 @@
         const data = await res.json();
         const cfgWebdavStatus = document.getElementById('cfgWebdavStatus');
         if (cfgWebdavStatus) {
-          cfgWebdavStatus.innerText = data.openlist_configured ? '已配置 WebDAV' : '未配置';
+          cfgWebdavStatus.innerText = data.openlist_configured ? '已配置 WebDAV' : '未配置 (可选)';
+          cfgWebdavStatus.className = data.openlist_configured 
+            ? 'font-mono text-emerald-600 font-bold text-xs' 
+            : 'font-mono text-slate-400 font-semibold text-xs';
+        }
+        if (data.openlist_webdav_url) {
+          const urlEl = document.getElementById('inputWebdavUrl');
+          if (urlEl) urlEl.value = data.openlist_webdav_url;
+        }
+        if (data.openlist_username) {
+          const userEl = document.getElementById('inputWebdavUser');
+          if (userEl) userEl.value = data.openlist_username;
         }
         if (data.openlist_backup_path) {
           const pathEl = document.getElementById('inputBackupPath');
           if (pathEl) pathEl.value = data.openlist_backup_path;
         }
       } catch {}
+    }
+
+    async function saveOpenListConfig() {
+      const btn = document.getElementById('btnSaveOpenList');
+      const url = (document.getElementById('inputWebdavUrl').value || '').trim();
+      const username = (document.getElementById('inputWebdavUser').value || '').trim();
+      const password = (document.getElementById('inputWebdavPass').value || '').trim();
+      const backupPath = (document.getElementById('inputBackupPath').value || '').trim();
+
+      const formData = new FormData();
+      formData.append('url', url);
+      formData.append('username', username);
+      if (password) formData.append('password', password);
+      formData.append('backup_path', backupPath);
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 保存中...';
+
+      try {
+        const headers = adminToken ? { 'X-Admin-Token': adminToken } : {};
+        const res = await fetch('/api/openlist/config', { method: 'POST', headers, body: formData });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(data.message || 'OpenList 配置已保存！');
+          document.getElementById('inputWebdavPass').value = '';
+          await fetchAppConfig();
+          testOpenListConnection();
+        } else {
+          showToast(data.detail || '保存配置失败', true);
+        }
+      } catch (err) {
+        showToast('保存异常: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> 保存 OpenList 配置并测试';
+      }
     }
 
     async function testOpenListConnection() {
@@ -1417,30 +1509,7 @@
     function selectMountTarget(mountPath) {
       const target = `${mountPath.replace(/\/$/, '')}/QR-Relay-Backup`;
       document.getElementById('inputBackupPath').value = target;
-      showToast(`已选定归档路径: ${target}，请点击保存路径`);
-    }
-
-    async function saveBackupPath() {
-      const path = document.getElementById('inputBackupPath').value.trim();
-      if (!path) {
-        showToast('路径不能为空', true);
-        return;
-      }
-      try {
-        const formData = new FormData();
-        formData.append('path', path);
-        const headers = adminToken ? { 'X-Admin-Token': adminToken } : {};
-        const res = await fetch('/api/openlist/path', {
-          method: 'POST',
-          headers,
-          body: formData
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail);
-        showToast(data.message);
-      } catch (err) {
-        showToast(err.message, true);
-      }
+      showToast(`已选定归档路径: ${target}，请点击保存配置`);
     }
   </script>
 </body>

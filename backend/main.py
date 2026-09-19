@@ -165,9 +165,35 @@ async def get_public_config(x_admin_token: Optional[str] = Header(None)):
         "max_file_size_mb": settings.MAX_FILE_SIZE_MB,
         "require_password": bool(settings.UPLOAD_PASSWORD),
         "openlist_configured": bool(settings.OPENLIST_WEBDAV_URL),
+        "openlist_webdav_url": settings.OPENLIST_WEBDAV_URL if is_admin else None,
+        "openlist_username": settings.OPENLIST_USERNAME if is_admin else None,
         "openlist_backup_path": settings.OPENLIST_BACKUP_PATH if is_admin else None,
         "openlist_auto_sync": settings.OPENLIST_AUTO_SYNC,
         "is_admin": is_admin
+    }
+
+@app.post("/api/openlist/config")
+async def save_openlist_config(
+    url: Optional[str] = Form(None),
+    username: Optional[str] = Form(None),
+    password: Optional[str] = Form(None),
+    backup_path: Optional[str] = Form(None),
+    admin_auth: bool = Depends(require_admin)
+):
+    if url is not None:
+        settings.OPENLIST_WEBDAV_URL = url.strip() or None
+    if username is not None:
+        settings.OPENLIST_USERNAME = username.strip() or None
+    if password is not None and password.strip():
+        settings.OPENLIST_PASSWORD = password.strip()
+    if backup_path is not None:
+        bp = backup_path.strip()
+        if bp and not bp.startswith("/"):
+            bp = f"/{bp}"
+        settings.OPENLIST_BACKUP_PATH = bp
+    return {
+        "success": True,
+        "message": "OpenList WebDAV 配置已成功保存！"
     }
 
 @app.post("/api/openlist/test")
