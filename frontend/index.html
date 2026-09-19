@@ -8,6 +8,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Pure JS QRCode Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -555,9 +557,10 @@
         <p class="text-[10px] text-slate-400 mt-1">在任意设备打开中转站，输入这 6 位数即可取件</p>
       </div>
 
-      <!-- QR Code Image -->
+      <!-- QR Code Image & Canvas -->
       <div class="bg-slate-50 p-3 rounded-2xl inline-block border border-slate-200/80 mb-3 shadow-inner">
-        <img id="modalQrImage" src="" alt="QR Code" class="w-44 h-44 mx-auto object-contain" />
+        <div id="modalQrCanvas" class="w-44 h-44 mx-auto flex items-center justify-center [&>img]:mx-auto [&>canvas]:mx-auto"></div>
+        <img id="modalQrImage" src="" alt="QR Code" class="w-44 h-44 mx-auto object-contain hidden" />
       </div>
 
       <!-- Mode Switch in Modal if Direct QR is available -->
@@ -1107,18 +1110,47 @@
 
     function switchModalQr(mode) {
       if (!currentModalData) return;
+      const canvasContainer = document.getElementById('modalQrCanvas');
       const img = document.getElementById('modalQrImage');
       const btnDirect = document.getElementById('btnSwitchDirect');
       const btnShare = document.getElementById('btnSwitchShare');
 
+      let targetText = '';
       if (mode === 'direct' && currentModalData.direct_qr) {
-        img.src = currentModalData.direct_qr;
+        targetText = currentModalData.content || currentModalData.title || '';
         btnDirect.className = 'flex-1 py-1 rounded-md font-bold bg-white text-brand-600 shadow-sm';
         btnShare.className = 'flex-1 py-1 rounded-md font-medium text-slate-600';
       } else {
-        img.src = currentModalData.share_qr;
+        targetText = currentModalData.share_url;
         btnShare.className = 'flex-1 py-1 rounded-md font-bold bg-white text-brand-600 shadow-sm';
         btnDirect.className = 'flex-1 py-1 rounded-md font-medium text-slate-600';
+      }
+
+      // 1. 优先使用纯前端 QRCode 库秒级本地渲染，100% 真实、标准、高可识读
+      if (window.QRCode && canvasContainer) {
+        canvasContainer.innerHTML = '';
+        canvasContainer.classList.remove('hidden');
+        if (img) img.classList.add('hidden');
+        try {
+          new QRCode(canvasContainer, {
+            text: targetText,
+            width: 176,
+            height: 176,
+            colorDark: '#1e1b4b',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+          return;
+        } catch (e) {
+          console.warn('QRCode JS render error, fallback to image:', e);
+        }
+      }
+
+      // 2. 降级使用服务端或 CDN 生成的图片
+      if (canvasContainer) canvasContainer.classList.add('hidden');
+      if (img) {
+        img.classList.remove('hidden');
+        img.src = (mode === 'direct' && currentModalData.direct_qr) ? currentModalData.direct_qr : currentModalData.share_qr;
       }
     }
 

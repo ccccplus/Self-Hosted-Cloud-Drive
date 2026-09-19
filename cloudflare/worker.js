@@ -274,8 +274,14 @@ export default {
     if (path.startsWith('/s/')) {
       if (env.ASSETS) {
         const shareUrl = new URL(request.url);
-        shareUrl.pathname = '/share.html';
-        return await env.ASSETS.fetch(new Request(shareUrl.toString(), request));
+        shareUrl.pathname = '/share';
+        const assetResp = await env.ASSETS.fetch(new Request(shareUrl.toString(), request));
+        return new Response(assetResp.body, {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/html; charset=utf-8'
+          }
+        });
       }
     }
 
@@ -300,6 +306,22 @@ export default {
     // --- 路由 3: 动态二维码生成 ---
     if (path === '/api/qrcode' && method === 'GET') {
       const data = url.searchParams.get('data') || '';
+      if (!data) return new Response("Missing data", { status: 400 });
+
+      try {
+        const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=${encodeURIComponent(data)}`;
+        const qrResp = await fetch(qrUrl);
+        if (qrResp.ok) {
+          return new Response(qrResp.body, {
+            headers: {
+              'Content-Type': 'image/png',
+              'Access-Control-Allow-Origin': '*',
+              'Cache-Control': 'public, max-age=86400'
+            }
+          });
+        }
+      } catch {}
+
       const svg = generateQrSvg(data);
       return new Response(svg, {
         headers: {
@@ -465,7 +487,7 @@ export default {
 
     // --- 路由 6: 查询单个条目信息 ---
     if (path.startsWith('/api/item/') && !path.endsWith('/sync') && method === 'GET') {
-      const code = path.replace('/api/item/', '');
+      const code = path.replace(/^\/api\/item\//, '').replace(/\/+$/, '').trim();
       const item = await env.DB.prepare("SELECT * FROM items WHERE code = ?").bind(code).first();
       if (!item) {
         return jsonResponse({ detail: "提取码不存在或已过期销毁" }, 404);
@@ -519,12 +541,14 @@ export default {
 
     // --- 路由 8: 删除条目 ---
     if (path.startsWith('/api/item/') && !path.endsWith('/sync') && method === 'DELETE') {
-      const code = path.replace('/api/item/', '');
+      const code = path.replace(/^\/api\/item\//, '').replace(/\/+$/, '').trim();
       const item = await env.DB.prepare("SELECT * FROM items WHERE code = ?").bind(code).first();
       if (!item) return jsonResponse({ detail: "条目不存在" }, 404);
 
       if (item.type === 'file' || item.type === 'image') {
-        try { await env.BUCKET.delete(item.content); } catch {}
+        if (env.BUCKET) {
+          try { await env.BUCKET.delete(item.content); } catch {}
+        }
       }
       await env.DB.prepare("DELETE FROM items WHERE code = ?").bind(code).run();
       return jsonResponse({ success: true, message: `条目 ${code} 已删除` });
@@ -532,7 +556,7 @@ export default {
 
     // --- 路由 9: 内容提取与文件下载 (支持阅后即焚) ---
     if (path.startsWith('/raw/') && method === 'GET') {
-      const code = path.replace('/raw/', '');
+      const code = path.replace(/^\/raw\//, '').replace(/\/+$/, '').trim();
       const item = await env.DB.prepare("SELECT * FROM items WHERE code = ?").bind(code).first();
       if (!item) return new Response("提取码不存在或已过期销毁", { status: 404 });
 

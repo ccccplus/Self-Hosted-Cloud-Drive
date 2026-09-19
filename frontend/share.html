@@ -148,10 +148,21 @@
     let itemData = null;
 
     window.addEventListener('DOMContentLoaded', () => {
-      const parts = window.location.pathname.split('/');
-      const code = parts[parts.length - 1] || parts[parts.length - 2];
+      // 1. 优先从 query 参数获取（例如 /share?code=123456 或 ?c=123456）
+      const urlParams = new URLSearchParams(window.location.search);
+      let code = urlParams.get('code') || urlParams.get('c');
+
+      // 2. 从路径参数获取（例如 /s/123456 或 /123456）
       if (!code) {
-        showError('无效的访问路径');
+        const parts = window.location.pathname.split('/').filter(Boolean);
+        const lastPart = parts[parts.length - 1];
+        if (lastPart && lastPart !== 's' && lastPart !== 'share') {
+          code = lastPart;
+        }
+      }
+
+      if (!code) {
+        showError('请在地址栏提供 6 位取件码，例如 /s/123456 或在首页输入取件码');
         return;
       }
       fetchItem(code);
