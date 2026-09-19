@@ -59,15 +59,20 @@
 
   <!-- Top App Bar / Header -->
   <header class="max-w-lg mx-auto w-full pt-2 pb-3 flex items-center justify-between">
-    <a href="/" class="flex items-center gap-2.5 active:scale-95 transition-all">
-      <div class="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-tr from-brand-600 to-purple-600 rounded-xl flex items-center justify-center text-white text-sm shadow-md shadow-brand-500/20">
+    <div class="flex items-center gap-2.5">
+      <a href="/" class="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-tr from-brand-600 to-purple-600 rounded-xl flex items-center justify-center text-white text-sm shadow-md shadow-brand-500/20 active:scale-95 transition-all">
         <i class="fa-solid fa-qrcode"></i>
-      </div>
+      </a>
       <div>
-        <span class="font-black text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">QR-Relay</span>
+        <div class="flex items-center gap-1.5">
+          <a href="/" class="font-black text-base sm:text-lg text-slate-900 tracking-tight block leading-tight">QR-Relay</a>
+          <a href="https://github.com/ccccplus/Self-Hosted-Cloud-Drive" target="_blank" rel="noopener noreferrer" class="text-slate-400 hover:text-slate-800 transition-all p-0.5" title="GitHub 源码">
+            <i class="fa-brands fa-github text-sm"></i>
+          </a>
+        </div>
         <span class="text-[10px] text-slate-400 font-medium hidden sm:block">临时云盘与中转站</span>
       </div>
-    </a>
+    </div>
     <a 
       href="/" 
       class="px-3 py-1.5 rounded-xl bg-white/80 border border-slate-200/80 text-xs text-brand-600 font-bold hover:bg-brand-50 active:scale-95 transition-all flex items-center gap-1.5 shadow-sm"
@@ -183,88 +188,16 @@
   </main>
 
   <!-- Mobile Footer -->
-  <footer class="max-w-lg mx-auto w-full pt-3 pb-2 text-center text-xs text-slate-400 space-y-1.5">
+  <footer class="max-w-lg mx-auto w-full pt-3 pb-2 text-center text-xs text-slate-400">
     <div class="flex items-center justify-center gap-2 flex-wrap">
       <span>QR-Relay · 临时云盘与二维码快传</span>
       <span class="text-slate-300">|</span>
-      <button onclick="openDisclaimerModal()" class="text-rose-500 hover:text-rose-600 font-semibold hover:underline">
-        免责声明与风险告知
-      </button>
+      <a href="https://github.com/ccccplus/Self-Hosted-Cloud-Drive" target="_blank" rel="noopener noreferrer" class="text-slate-500 hover:text-slate-800 font-semibold hover:underline flex items-center gap-1 active:scale-95 transition-all">
+        <i class="fa-brands fa-github text-xs"></i>
+        <span>GitHub</span>
+      </a>
     </div>
-    <p class="text-[10px] text-slate-400 leading-relaxed px-2">
-      ⚠️ 仅限个人非商业自用 · 严禁传输涉密、商业机密或违法违规数据
-    </p>
   </footer>
-
-  <!-- Disclaimer & Risk Disclosure Modal -->
-  <div id="disclaimerModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 hidden">
-    <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-7 shadow-2xl border border-slate-100 transform transition-all max-h-[88vh] overflow-y-auto text-left">
-      <div class="flex justify-between items-center mb-3 pb-3 border-b border-slate-100">
-        <div class="flex items-center gap-2 text-rose-600 font-black text-sm sm:text-base">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-          <span>免责声明与风险告知书</span>
-        </div>
-        <button onclick="closeDisclaimerModal()" class="text-slate-400 hover:text-slate-600 p-1 active:scale-90">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-
-      <div class="space-y-3.5 text-xs text-slate-600 leading-relaxed">
-        <div class="p-3 bg-rose-50 rounded-2xl border border-rose-100 text-rose-800 text-xs font-semibold">
-          重要须知：使用或部署本项目，即视为您已完全阅读、充分理解并无保留地接受以下全部合规与免责条款。如您不同意，请立即停止使用并删除相关代码。
-        </div>
-
-        <div>
-          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-            1. 仅限个人使用 · 严禁商业用途
-          </h4>
-          <p class="text-[11px] text-slate-500 pl-3">
-            本项目属于开源技术研究与个人网络工具，<strong>仅供个人学习、技术探讨及私有家庭/办公局域网临时快传自用。严禁将本项目直接或间接用于任何商业运营、营利性收费服务、广告变现、非法中转站或向公众提供大规模公用存储分发服务。</strong>
-          </p>
-        </div>
-
-        <div>
-          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-            2. 数据安全与隐私泄露风险提示
-          </h4>
-          <p class="text-[11px] text-slate-500 pl-3">
-            本项目采用 6 位口令快传机制，在公网部署且未加设强鉴权的环境下，客观存在提取码被穷举扫描、撞库或被中间人恶意窃取的潜在风险。<strong>严禁传输任何高敏感个人隐私（身份证、护照、生物识别）、企业核心机密、财务账密、密码证书或国家涉密档案！</strong>因使用者自行部署配置失误、口令过于简单或服务器遭受黑客攻击所引发的数据损毁、泄露或灭失，本项目开发者不承担任何责任。
-          </p>
-        </div>
-
-        <div>
-          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-            3. 网络法律合规与零容忍原则
-          </h4>
-          <p class="text-[11px] text-slate-500 pl-3">
-            使用者与服务器运营者必须严格遵守所在国家或地区的宪法、互联网安全法规及监管政策。<strong>严禁利用本项目传输、存储、中转或散播任何侵犯他人知识产权、淫秽色情、赌博洗钱、电信诈骗、暴力恐怖、虚假有害信息、恶意木马病毒勒索软件等违法违规内容。</strong>任何因使用者滥用本项目导致的民事侵权赔偿、行政处罚或刑事责任，均由使用者与部署者承担全部责任，与本项目作者没有任何连带关系！
-          </p>
-        </div>
-
-        <div>
-          <h4 class="font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-            <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-            4. 软件按现状提供 (AS IS)
-          </h4>
-          <p class="text-[11px] text-slate-500 pl-3">
-            本软件按“现状”提供，原作者不提供任何明示或暗示的保证（包括但不限于商业适销性、特定用途适用性及无故障保证）。作者亦不对因使用或无法使用本软件所导致的任何直接、间接或附带损失承担责任。
-          </p>
-        </div>
-      </div>
-
-      <div class="pt-4 mt-3 border-t border-slate-100 flex justify-end">
-        <button 
-          onclick="closeDisclaimerModal()"
-          class="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow active:scale-95 transition-all"
-        >
-          我已充分知悉风险并同意遵守
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- Centered Toast Notification for Mobile -->
   <div 
@@ -371,15 +304,6 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
 
-    function openDisclaimerModal() {
-      const modal = document.getElementById('disclaimerModal');
-      if (modal) modal.classList.remove('hidden');
-    }
-
-    function closeDisclaimerModal() {
-      const modal = document.getElementById('disclaimerModal');
-      if (modal) modal.classList.add('hidden');
-    }
   </script>
 </body>
 </html>
