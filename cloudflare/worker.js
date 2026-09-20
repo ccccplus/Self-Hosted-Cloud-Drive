@@ -432,8 +432,16 @@ export default {
       const syncStatus = (syncToOpenList && openlistCfg.url) ? 'pending' : 'disabled';
 
       const mimeType = file.type || 'application/octet-stream';
-      const itemType = mimeType.startsWith('image/') ? 'image' : 'file';
-      const r2Key = `uploads/${code}_${file.name}`;
+      const fileNameLower = (file.name || '').toLowerCase();
+      let itemType = 'file';
+      if (mimeType.startsWith('image/')) {
+        itemType = 'image';
+      } else if (mimeType.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|m4v|flv|3gp)$/i.test(fileNameLower)) {
+        itemType = 'video';
+      }
+
+      const ext = (file.name.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      const r2Key = `uploads/${code}_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}${ext}`;
 
       if (!env.BUCKET) {
         return jsonResponse({
@@ -577,16 +585,53 @@ export default {
         });
       }
 
-      const r2Object = await env.BUCKET.get(item.content);
+      const isDownload = url.searchParams.get('download') === '1' || url.searchParams.get('dl') === '1';
+      const rangeHeader = request.headers.get('Range');
+
+      let r2Object;
+      if (rangeHeader) {
+        r2Object = await env.BUCKET.get(item.content, {
+          range: request.headers,
+          onlyIf: request.headers
+        });
+      } else {
+        r2Object = await env.BUCKET.get(item.content, {
+          onlyIf: request.headers
+        });
+      }
+
       if (!r2Object) return new Response("物理存储对象不存在或已被清理", { status: 404 });
 
       const headers = new Headers();
       r2Object.writeHttpMetadata(headers);
       headers.set('etag', r2Object.httpEtag);
+      headers.set('Accept-Ranges', 'bytes');
       headers.set('Content-Type', item.mime_type || 'application/octet-stream');
-      headers.set('Content-Disposition', `inline; filename="${encodeURIComponent(item.title || 'download')}"`);
 
-      return new Response(r2Object.body, { headers });
+      // RFC 6266 Content-Disposition with safe ASCII fallback and UTF-8 filename*
+      const rawTitle = item.title || 'download';
+      const ext = (rawTitle.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      const asciiFallback = `download${ext}`;
+      const encodedTitle = encodeURIComponent(rawTitle);
+      const isMedia = item.type === 'image' || item.type === 'video' || (item.mime_type && (item.mime_type.startsWith('image/') || item.mime_type.startsWith('video/')));
+      const disposition = (isDownload || !isMedia) ? 'attachment' : 'inline';
+
+      headers.set(
+        'Content-Disposition',
+        `${disposition}; filename="${asciiFallback}"; filename*=UTF-8''${encodedTitle}`
+      );
+
+      // Support HTTP 206 Partial Content for video/audio streaming
+      if (r2Object.range) {
+        headers.set(
+          'Content-Range',
+          `bytes ${r2Object.range.offset}-${r2Object.range.offset + r2Object.range.length - 1}/${r2Object.size}`
+        );
+        headers.set('Content-Length', r2Object.range.length.toString());
+        return new Response(r2Object.body, { status: 206, headers });
+      }
+
+      return new Response(r2Object.body, { status: 200, headers });
     }
 
     // --- 路由 10: 管理员登录 ---

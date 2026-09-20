@@ -158,6 +158,35 @@
         </a>
       </div>
 
+      <!-- Video Section (Player + Download) -->
+      <div id="videoSection" class="hidden space-y-4 text-center">
+        <div class="rounded-2xl overflow-hidden border border-slate-200/80 bg-slate-950 max-h-[55vh] flex items-center justify-center p-1 shadow-inner">
+          <video 
+            id="videoPlayer" 
+            controls 
+            playsinline 
+            preload="metadata" 
+            class="max-h-[53vh] w-full rounded-xl object-contain mx-auto"
+            src=""
+          >
+            您的浏览器暂不支持直接播放该视频格式，请点击下方按钮直接下载。
+          </video>
+        </div>
+        <div class="py-3 px-3 bg-slate-50/70 rounded-2xl border border-slate-200/60">
+          <h3 id="videoName" class="text-sm sm:text-base font-bold text-slate-800 break-all px-2">video.mp4</h3>
+          <p id="videoSize" class="text-xs text-slate-400 font-mono mt-1">0 KB</p>
+        </div>
+        <a 
+          id="btnDownloadVideo" 
+          href="#" 
+          download 
+          class="block w-full py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-[0.98] text-white font-bold text-sm rounded-xl shadow-lg shadow-purple-500/25 transition-all flex items-center justify-center gap-2"
+        >
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+          <span>保存 / 下载原视频到本地</span>
+        </a>
+      </div>
+
       <!-- File Section -->
       <div id="fileSection" class="hidden space-y-5 text-center">
         <div class="py-5 px-3 bg-slate-50/70 rounded-2xl border border-slate-200/60">
@@ -257,21 +286,39 @@
         document.getElementById('badgeBurn').classList.remove('hidden');
       }
 
+      const mime = (data.mime_type || '').toLowerCase();
+      const filename = data.title || data.content || '';
+      const isVideo = data.type === 'video' || mime.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|m4v|flv|3gp)$/i.test(filename);
+
       if (data.type === 'text') {
         document.getElementById('badgeType').innerText = '文字备忘';
         document.getElementById('textSection').classList.remove('hidden');
         document.getElementById('textContent').innerText = data.content;
-      } else if (data.type === 'image') {
+      } else if (data.type === 'image' || mime.startsWith('image/')) {
         document.getElementById('badgeType').innerText = '图片文件';
         document.getElementById('imageSection').classList.remove('hidden');
         document.getElementById('imagePreview').src = data.raw_url;
-        document.getElementById('btnDownloadImage').href = data.raw_url;
+        const btnImg = document.getElementById('btnDownloadImage');
+        btnImg.href = data.raw_url + '?download=1';
+        btnImg.setAttribute('download', filename || 'image.png');
+      } else if (isVideo) {
+        document.getElementById('badgeType').innerText = '视频文件';
+        document.getElementById('videoSection').classList.remove('hidden');
+        const player = document.getElementById('videoPlayer');
+        player.src = data.raw_url;
+        document.getElementById('videoName').innerText = filename;
+        document.getElementById('videoSize').innerText = formatBytes(data.file_size);
+        const btnVid = document.getElementById('btnDownloadVideo');
+        btnVid.href = data.raw_url + '?download=1';
+        btnVid.setAttribute('download', filename || 'video.mp4');
       } else {
         document.getElementById('badgeType').innerText = '附件文件';
         document.getElementById('fileSection').classList.remove('hidden');
-        document.getElementById('fileName').innerText = data.title || data.content;
+        document.getElementById('fileName').innerText = filename;
         document.getElementById('fileSize').innerText = formatBytes(data.file_size);
-        document.getElementById('btnDownloadFile').href = data.raw_url;
+        const btnFile = document.getElementById('btnDownloadFile');
+        btnFile.href = data.raw_url + '?download=1';
+        btnFile.setAttribute('download', filename || 'download');
       }
     }
 

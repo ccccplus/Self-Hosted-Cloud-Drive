@@ -1,6 +1,7 @@
 import os
 import uuid
 import mimetypes
+from urllib.parse import quote
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional
@@ -117,7 +118,7 @@ async def get_qrcode_image(data: str):
     return Response(content=png_bytes, media_type="image/png")
 
 @app.get("/raw/{code}")
-async def raw_item_content(code: str):
+async def raw_item_content(code: str, download: Optional[bool] = False):
     item = get_item_by_code(code)
     if not item:
         raise HTTPException(status_code=404, detail="提取码不存在或已过期销毁")
@@ -129,11 +130,28 @@ async def raw_item_content(code: str):
             delete_item_by_code(code)
         return Response(content=item["content"], media_type="text/plain; charset=utf-8")
 
-    # File or Image
+    # File, Video or Image
     local_filename = item["content"]
     file_path = settings.UPLOAD_DIR / local_filename
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="物理文件已被清理或丢失")
+
+    real_filename = item["title"] or local_filename
+    encoded_filename = quote(real_filename)
+    file_ext = Path(real_filename).suffix or ".bin"
+    ascii_fallback = f"download{file_ext}"
+
+    is_media = (item["type"] in ["image", "video"]) or (
+        bool(item.get("mime_type")) and (
+            item["mime_type"].startswith("image/") or item["mime_type"].startswith("video/")
+        )
+    )
+    disposition = "attachment" if (download or not is_media) else "inline"
+
+    headers = {
+        "Content-Disposition": f"{disposition}; filename=\"{ascii_fallback}\"; filename*=utf-8''{encoded_filename}",
+        "Accept-Ranges": "bytes"
+    }
 
     # If burn after reading, delete file and DB after reading
     if item["burn_after_reading"]:
@@ -149,15 +167,15 @@ async def raw_item_content(code: str):
         background.add_task(remove_file)
         return FileResponse(
             path=str(file_path),
-            filename=item["title"] or local_filename,
             media_type=item["mime_type"] or "application/octet-stream",
+            headers=headers,
             background=background
         )
 
     return FileResponse(
         path=str(file_path),
-        filename=item["title"] or local_filename,
-        media_type=item["mime_type"] or "application/octet-stream"
+        media_type=item["mime_type"] or "application/octet-stream",
+        headers=headers
     )
 
 # --- Admin Auth Endpoints ---
@@ -356,7 +374,15 @@ async def upload_file_relay(
     if not mime_type:
         mime_type = file.content_type or "application/octet-stream"
 
-    item_type = "image" if mime_type.startswith("image/") else "file"
+    lower_ext = ext.lower()
+    if mime_type.startswith("image/"):
+        item_type = "image"
+    elif mime_type.startswith("video/") or lower_ext in [".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v", ".flv", ".3gp"]:
+        item_type = "video"
+        if mime_type == "application/octet-stream":
+            mime_type = "video/mp4"
+    else:
+        item_type = "file"
 
     expires_at = None
     if expire_seconds and expire_seconds > 0:

@@ -246,6 +246,51 @@ class TestQRRelayCore(unittest.TestCase):
             data={'old_password': 'test_admin_pass', 'new_password': 'admin123'}
         )
 
+    def test_chinese_video_upload_and_stream(self):
+        import io
+        from fastapi.testclient import TestClient
+        from backend.main import app
+
+        client = TestClient(app)
+        chinese_name = "我的测试小视频_假期旅游.mp4"
+        fake_video_bytes = b"\x00\x00\x00\x18ftypmp42" + b"A" * 1000
+
+        # 1. Upload Chinese video
+        files = {"file": (chinese_name, io.BytesIO(fake_video_bytes), "video/mp4")}
+        res = client.post("/api/upload", files=files)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["type"], "video")
+        self.assertEqual(data["title"], chinese_name)
+        code = data["code"]
+
+        # 2. Get item info
+        r_info = client.get(f"/api/item/{code}")
+        self.assertEqual(r_info.status_code, 200)
+        self.assertEqual(r_info.json()["type"], "video")
+
+        # 3. Inline streaming headers
+        r_stream = client.get(f"/raw/{code}")
+        self.assertEqual(r_stream.status_code, 200)
+        cd = r_stream.headers.get("content-disposition", "")
+        self.assertIn("inline", cd)
+        self.assertIn('filename="download.mp4"', cd)
+        self.assertIn("filename*=utf-8''", cd)
+        self.assertEqual(r_stream.headers.get("accept-ranges"), "bytes")
+
+        # 4. Range request (Partial Content 206)
+        r_range = client.get(f"/raw/{code}", headers={"Range": "bytes=0-99"})
+        self.assertEqual(r_range.status_code, 206)
+        self.assertEqual(len(r_range.content), 100)
+        self.assertIn("bytes 0-99/", r_range.headers.get("content-range", ""))
+
+        # 5. Download parameter (?download=1)
+        r_dl = client.get(f"/raw/{code}?download=1")
+        self.assertEqual(r_dl.status_code, 200)
+        cd_dl = r_dl.headers.get("content-disposition", "")
+        self.assertIn("attachment", cd_dl)
+        self.assertIn('filename="download.mp4"', cd_dl)
+
 if __name__ == "__main__":
     unittest.main()
 

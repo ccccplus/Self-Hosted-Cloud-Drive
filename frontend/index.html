@@ -1249,6 +1249,8 @@
       const iconEl = document.getElementById('previewIcon');
       if (file.type.startsWith('image/')) {
         iconEl.innerHTML = '<i class="fa-solid fa-image text-brand-600"></i>';
+      } else if (file.type.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|m4v|flv|3gp)$/i.test(file.name)) {
+        iconEl.innerHTML = '<i class="fa-solid fa-video text-purple-600"></i>';
       } else {
         iconEl.innerHTML = '<i class="fa-solid fa-file text-slate-600"></i>';
       }
