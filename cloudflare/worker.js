@@ -68,6 +68,91 @@ function validateCustomCode(code) {
   return null;
 }
 
+// --- AWS S3 v4 纯原生 Web Crypto 预签名实现（用于 R2 超大文件直传）---
+async function sha256Hex(data) {
+  const enc = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hmacRaw(key, data) {
+  const keyBuf = typeof key === 'string' ? new TextEncoder().encode(key) : key;
+  const dataBuf = typeof data === 'string' ? new TextEncoder().encode(data) : data;
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyBuf,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', cryptoKey, dataBuf);
+  return new Uint8Array(sig);
+}
+
+async function generateR2PresignedPutUrl(env, key, expiresInSeconds = 900) {
+  const accountId = (env.CF_ACCOUNT_ID || env.ACCOUNT_ID || '').trim();
+  const accessKeyId = (env.R2_ACCESS_KEY_ID || '').trim();
+  const secretAccessKey = (env.R2_SECRET_ACCESS_KEY || '').trim();
+  const bucketName = 'qr-relay-files';
+
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    throw new Error('未配置 R2 API 令牌凭据 (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)');
+  }
+
+  const now = new Date();
+  const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
+  const dateStamp = amzDate.slice(0, 8);
+  const region = 'auto';
+  const service = 's3';
+
+  const host = `${accountId}.r2.cloudflarestorage.com`;
+  const canonicalUri = '/' + [bucketName, ...key.split('/')].map(encodeURIComponent).join('/');
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+
+  const queryParams = [
+    ['X-Amz-Algorithm', 'AWS4-HMAC-SHA256'],
+    ['X-Amz-Credential', `${accessKeyId}/${credentialScope}`],
+    ['X-Amz-Date', amzDate],
+    ['X-Amz-Expires', expiresInSeconds.toString()],
+    ['X-Amz-SignedHeaders', 'host']
+  ];
+
+  const canonicalQueryString = queryParams
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+    .join('&');
+
+  const canonicalHeaders = `host:${host}\n`;
+  const signedHeaders = 'host';
+  const payloadHash = 'UNSIGNED-PAYLOAD';
+
+  const canonicalRequest = [
+    'PUT',
+    canonicalUri,
+    canonicalQueryString,
+    canonicalHeaders,
+    signedHeaders,
+    payloadHash
+  ].join('\n');
+
+  const stringToSign = [
+    'AWS4-HMAC-SHA256',
+    amzDate,
+    credentialScope,
+    await sha256Hex(canonicalRequest)
+  ].join('\n');
+
+  const kDate = await hmacRaw('AWS4' + secretAccessKey, dateStamp);
+  const kRegion = await hmacRaw(kDate, region);
+  const kService = await hmacRaw(kRegion, service);
+  const kSigning = await hmacRaw(kService, 'aws4_request');
+  const signature = Array.from(await hmacRaw(kSigning, stringToSign))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+
+  return `https://${host}${canonicalUri}?${canonicalQueryString}&X-Amz-Signature=${signature}`;
+}
+
+
 async function getAdminPassword(db, defaultPwd = 'admin123') {
   try {
     const row = await db.prepare("SELECT value FROM system_settings WHERE key = 'admin_password'").first();
@@ -298,12 +383,18 @@ export default {
         usedStorageBytes = sumRow ? (Number(sumRow.total_size) || 0) : 0;
       } catch {}
 
+      const directUploadConfigured = Boolean(
+        env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && (env.CF_ACCOUNT_ID || env.ACCOUNT_ID)
+      );
+
       return jsonResponse({
         app_name: env.APP_NAME || "QR-Relay",
         max_file_size_mb: parseInt(env.MAX_FILE_SIZE_MB || "100"),
         max_total_storage_gb: maxTotalStorageGb,
         used_storage_bytes: usedStorageBytes,
         max_storage_bytes: maxTotalBytes,
+        direct_upload_configured: directUploadConfigured,
+        max_direct_file_size_mb: parseInt(env.MAX_DIRECT_FILE_SIZE_MB || "5120"),
         require_password: false,
         openlist_configured: Boolean(cfg.url),
         openlist_webdav_url: isAdmin ? cfg.url : null,
@@ -511,9 +602,159 @@ export default {
         mime_type: mimeType,
         share_url: shareUrl,
         share_qr: shareQr,
+        direct_qr: `${origin}/raw/${code}`,
         expires_at: expiresAt,
         burn_after_reading: burnAfterReading,
         openlist_sync_status: syncStatus
+      });
+    }
+
+    // --- 路由: 大文件 R2 预签名直传申请 ---
+    if (path === '/api/upload/direct-request' && method === 'POST') {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ detail: "无效的请求格式" }, 400);
+      }
+
+      const filename = (body.filename || 'file').trim();
+      const fileSize = Number(body.file_size) || 0;
+      const customCode = (body.custom_code || '').trim();
+
+      if (fileSize <= 0) {
+        return jsonResponse({ detail: "文件大小不能为空" }, 400);
+      }
+
+      // 存储配额安全熔断（脱敏，确保不超 10GB）
+      const maxTotalStorageGb = parseFloat(env.MAX_TOTAL_STORAGE_GB || "10");
+      const maxTotalBytes = maxTotalStorageGb * 1024 * 1024 * 1024;
+      try {
+        const sumRow = await env.DB.prepare("SELECT COALESCE(SUM(file_size), 0) as total_size FROM items WHERE type != 'text'").first();
+        const currentStorage = sumRow ? (Number(sumRow.total_size) || 0) : 0;
+        if (currentStorage + fileSize > maxTotalBytes) {
+          return jsonResponse({
+            detail: "中转站存储空间不足！上传此文件将超出系统分配的存储配额。请先清理不需要的中转文件或等待到期自动销毁以腾出空间。"
+          }, 413);
+        }
+      } catch {}
+
+      // 提取码校验
+      let code;
+      if (customCode) {
+        const err = validateCustomCode(customCode);
+        if (err) return jsonResponse({ detail: err }, 400);
+        const existing = await env.DB.prepare("SELECT code FROM items WHERE code = ?").bind(customCode).first();
+        if (existing) return jsonResponse({ detail: `提取码 [ ${customCode} ] 已被占用，请更换` }, 400);
+        code = customCode;
+      } else {
+        code = await generateUniqueCode(env.DB);
+      }
+
+      const ext = (filename.match(/\.[a-zA-Z0-9]+$/) || [''])[0];
+      const r2Key = `uploads/${code}_${crypto.randomUUID().replace(/-/g, '').slice(0, 8)}${ext}`;
+
+      let uploadUrl;
+      try {
+        uploadUrl = await generateR2PresignedPutUrl(env, r2Key, 900);
+      } catch (err) {
+        return jsonResponse({
+          detail: "超大文件直传未就绪：请先在 Cloudflare 控制台为 Worker 配置 R2 API 令牌 (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)。"
+        }, 500);
+      }
+
+      return jsonResponse({
+        success: true,
+        code,
+        r2_key: r2Key,
+        upload_url: uploadUrl,
+        expires_in: 900
+      });
+    }
+
+    // --- 路由: 大文件 R2 直传完工上报 ---
+    if (path === '/api/upload/direct-complete' && method === 'POST') {
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return jsonResponse({ detail: "无效的请求格式" }, 400);
+      }
+
+      const code = (body.code || '').trim();
+      const r2Key = (body.r2_key || '').trim();
+      const filename = (body.filename || 'file').trim();
+      const fileSize = Number(body.file_size) || 0;
+      const mimeType = (body.mime_type || 'application/octet-stream').trim();
+      const expireSeconds = parseInt(body.expire_seconds) || 0;
+      const burnAfterReading = Boolean(body.burn_after_reading);
+      const syncToOpenList = Boolean(body.sync_to_openlist);
+
+      if (!code || !r2Key) {
+        return jsonResponse({ detail: "缺少关键参数" }, 400);
+      }
+
+      // 校验 R2 对象是否存在
+      if (env.BUCKET) {
+        const objHead = await env.BUCKET.head(r2Key);
+        if (!objHead) {
+          return jsonResponse({ detail: "未在存储桶检测到上传的文件，请确认文件是否已成功直传" }, 400);
+        }
+      }
+
+      const fileNameLower = filename.toLowerCase();
+      let itemType = 'file';
+      if (mimeType.startsWith('image/')) {
+        itemType = 'image';
+      } else if (mimeType.startsWith('video/') || /\.(mp4|mov|webm|mkv|avi|m4v|flv|3gp)$/i.test(fileNameLower)) {
+        itemType = 'video';
+      }
+
+      const now = new Date();
+      const expiresAt = expireSeconds > 0 ? new Date(now.getTime() + expireSeconds * 1000).toISOString() : null;
+      const nowIso = now.toISOString();
+      const openlistCfg = await getOpenListConfig(env.DB, env);
+      const syncStatus = (syncToOpenList && openlistCfg.url) ? 'pending' : 'disabled';
+
+      await env.DB.prepare(`
+        INSERT INTO items (
+          code, type, title, content, file_size, mime_type,
+          created_at, expires_at, burn_after_reading, openlist_sync_status
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        code, itemType, filename, r2Key, fileSize, mimeType,
+        nowIso, expiresAt, burnAfterReading ? 1 : 0, syncStatus
+      ).run();
+
+      const shareUrl = `${origin}/s/${code}`;
+      const shareQr = `/api/qrcode?data=${encodeURIComponent(shareUrl)}`;
+      const directQr = `${origin}/raw/${code}`;
+
+      const item = {
+        code, type: itemType, title: filename, content: r2Key,
+        file_size: fileSize, mime_type: mimeType, created_at: nowIso,
+        expires_at: expiresAt, burn_after_reading: burnAfterReading,
+        openlist_sync_status: syncStatus
+      };
+
+      if (syncToOpenList && openlistCfg.url && ctx) {
+        ctx.waitUntil(syncItemToOpenList(env, item));
+      }
+
+      return jsonResponse({
+        success: true,
+        code,
+        title: filename,
+        type: itemType,
+        file_size: fileSize,
+        mime_type: mimeType,
+        share_url: shareUrl,
+        share_qr: shareQr,
+        direct_qr: directQr,
+        expires_at: expiresAt,
+        burn_after_reading: burnAfterReading,
+        openlist_sync_status: syncStatus,
+        is_direct_upload: true
       });
     }
 

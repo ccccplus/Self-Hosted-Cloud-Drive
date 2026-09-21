@@ -860,6 +860,7 @@
     let currentTab = 'text';
     let selectedFile = null;
     let currentModalData = null;
+    let currentAppConfig = null;
     let adminToken = localStorage.getItem('qr_relay_admin_token') || null;
     let isAdmin = false;
 
@@ -1331,6 +1332,19 @@
         return;
       }
 
+      const standardMaxBytes = ((currentAppConfig && currentAppConfig.max_file_size_mb) || 100) * 1024 * 1024;
+      const directConfigured = currentAppConfig ? currentAppConfig.direct_upload_configured : false;
+
+      // 如果单文件超过标准限制 (100MB)
+      if (selectedFile.size > standardMaxBytes) {
+        if (!directConfigured) {
+          showToast(`该文件 (${formatBytes(selectedFile.size)}) 超出单文件限制 (${Math.round(standardMaxBytes / (1024 * 1024))}MB)。如需直传超大文件，请先在 Cloudflare 后台配置 R2 令牌。`, true);
+          return;
+        }
+        await submitDirectFile();
+        return;
+      }
+
       const btn = document.getElementById('btnSubmitFile');
       btn.disabled = true;
 
@@ -1392,6 +1406,106 @@
       };
 
       xhr.send(formData);
+    }
+
+    // --- Submit Direct File (>100MB R2 Presigned Direct Upload) ---
+    async function submitDirectFile() {
+      const btn = document.getElementById('btnSubmitFile');
+      btn.disabled = true;
+
+      const progressContainer = document.getElementById('uploadProgressContainer');
+      const progressBar = document.getElementById('uploadProgressBar');
+      const percentText = document.getElementById('uploadPercent');
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      percentText.innerText = '0%';
+
+      const expireVal = parseInt(document.getElementById('fileExpire').value);
+      const isBurn = expireVal === -1;
+      const expireSeconds = isBurn ? null : expireVal;
+      const syncOpenList = document.getElementById('fileSyncOpenList').checked;
+      const customCode = document.getElementById('fileCustomCode').value.trim();
+
+      try {
+        // 阶段一：向服务端申请直传凭证与 6 位口令
+        const reqRes = await fetch('/api/upload/direct-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filename: selectedFile.name,
+            file_size: selectedFile.size,
+            mime_type: selectedFile.type || 'application/octet-stream',
+            custom_code: customCode
+          })
+        });
+
+        const reqData = await reqRes.json();
+        if (!reqRes.ok) {
+          throw new Error(reqData.detail || '申请直传通道失败');
+        }
+
+        // 阶段二：浏览器直接向 R2 存储桶 PUT 写入文件数据并驱动进度条
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', reqData.upload_url, true);
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              const percent = Math.round((e.loaded / e.total) * 100);
+              progressBar.style.width = `${percent}%`;
+              percentText.innerText = `${percent}%`;
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`R2 直传失败 (HTTP ${xhr.status})。请确认已在 R2 存储桶设置中添加 CORS 跨域规则。`));
+            }
+          };
+
+          xhr.onerror = () => {
+            reject(new Error('直传网络连接失败，请检查网络或 R2 跨域 (CORS) 配置'));
+          };
+
+          xhr.send(selectedFile);
+        });
+
+        // 阶段三：通知服务端完成登记元数据
+        const compRes = await fetch('/api/upload/direct-complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: reqData.code,
+            r2_key: reqData.r2_key,
+            filename: selectedFile.name,
+            file_size: selectedFile.size,
+            mime_type: selectedFile.type || 'application/octet-stream',
+            expire_seconds: expireSeconds,
+            burn_after_reading: isBurn,
+            sync_to_openlist: syncOpenList
+          })
+        });
+
+        const compData = await compRes.json();
+        if (!compRes.ok) {
+          throw new Error(compData.detail || '完成直传登记失败');
+        }
+
+        recordUploadedCode(compData.code);
+        openQrModal(compData);
+        clearSelectedFile();
+        document.getElementById('fileCustomCode').value = '';
+        showToast('超大文件直传成功，已生成 6 位口令！');
+        fetchAppConfig();
+      } catch (err) {
+        showToast(err.message, true);
+      } finally {
+        btn.disabled = false;
+        progressContainer.classList.add('hidden');
+        progressBar.style.width = '0%';
+      }
     }
 
     // --- Modal Management ---
@@ -1724,6 +1838,7 @@
         const headers = adminToken ? { 'X-Admin-Token': adminToken } : {};
         const res = await fetch('/api/config', { headers });
         const data = await res.json();
+        currentAppConfig = data;
         const cfgWebdavStatus = document.getElementById('cfgWebdavStatus');
         if (cfgWebdavStatus) {
           cfgWebdavStatus.innerText = data.openlist_configured ? '已配置 WebDAV' : '未配置 (可选)';
@@ -1739,9 +1854,11 @@
           const userEl = document.getElementById('inputWebdavUser');
           if (userEl) userEl.value = data.openlist_username;
         }
-        if (data.max_file_size_mb) {
-          const hintEl = document.getElementById('fileLimitHint');
-          if (hintEl) {
+        const hintEl = document.getElementById('fileLimitHint');
+        if (hintEl) {
+          if (data.direct_upload_configured) {
+            hintEl.innerText = `单文件上限 ${data.max_file_size_mb}MB（超 100MB 自动启用 R2 专属直传，最高 5GB），上传后生成 6 位取件码与二维码`;
+          } else if (data.max_file_size_mb) {
             hintEl.innerText = `单文件上限 ${data.max_file_size_mb}MB，上传后将生成专属 6 位取件码与下载二维码`;
           }
         }

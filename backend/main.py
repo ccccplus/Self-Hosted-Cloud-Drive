@@ -225,6 +225,8 @@ async def get_public_config(x_admin_token: Optional[str] = Header(None)):
         "max_total_storage_gb": settings.MAX_TOTAL_STORAGE_GB,
         "used_storage_bytes": current_storage,
         "max_storage_bytes": max_total_bytes,
+        "direct_upload_configured": True,
+        "max_direct_file_size_mb": settings.MAX_FILE_SIZE_MB,
         "require_password": bool(settings.UPLOAD_PASSWORD),
         "openlist_configured": bool(settings.OPENLIST_WEBDAV_URL),
         "openlist_webdav_url": settings.OPENLIST_WEBDAV_URL if is_admin else None,

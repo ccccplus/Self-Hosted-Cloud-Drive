@@ -39,3 +39,11 @@ APP_NAME = "QR-Relay"
 MAX_FILE_SIZE_MB = "100"
 MAX_TOTAL_STORAGE_GB = "10"
 ADMIN_PASSWORD = "admin123"
+
+# -------------------------------------------------------------
+# Optional: R2 Direct Upload for >100MB files (up to 5GB)
+# 在 Cloudflare 控制台 [Worker 设置] -> [变量与机密] 中添加以下变量开启：
+# CF_ACCOUNT_ID = "your-account-id"
+# R2_ACCESS_KEY_ID = "your-r2-access-key-id"
+# R2_SECRET_ACCESS_KEY = "your-r2-secret-access-key"
+# -------------------------------------------------------------
