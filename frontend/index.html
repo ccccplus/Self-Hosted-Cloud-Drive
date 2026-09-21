@@ -323,7 +323,7 @@
           </div>
           <div>
             <p class="text-sm sm:text-base font-bold text-slate-800">点击拍照 / 选取手机相册照片或文件</p>
-            <p class="text-xs text-slate-400 mt-1">单文件上限 100MB，上传后将生成专属 6 位取件码与下载二维码</p>
+            <p id="fileLimitHint" class="text-xs text-slate-400 mt-1">单文件上限 100MB，上传后将生成专属 6 位取件码与下载二维码</p>
           </div>
           <input type="file" id="fileInput" class="hidden" onchange="handleFileSelected(event)" />
         </div>
@@ -1731,6 +1731,12 @@
         if (data.openlist_username) {
           const userEl = document.getElementById('inputWebdavUser');
           if (userEl) userEl.value = data.openlist_username;
+        }
+        if (data.max_file_size_mb) {
+          const hintEl = document.getElementById('fileLimitHint');
+          if (hintEl) {
+            hintEl.innerText = `单文件上限 ${data.max_file_size_mb}MB，上传后将生成专属 6 位取件码与下载二维码`;
+          }
         }
         if (data.openlist_backup_path) {
           const pathEl = document.getElementById('inputBackupPath');
