@@ -119,7 +119,10 @@
             文字
           </span>
           <span id="badgeBurn" class="hidden px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 font-bold text-xs flex items-center gap-1">
-            <i class="fa-solid fa-fire text-xs"></i> 阅后即焚已销毁
+            <i class="fa-solid fa-fire text-xs"></i> 阅后即焚
+          </span>
+          <span id="badgeExpire" class="hidden px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 font-bold text-xs flex items-center gap-1">
+            <i class="fa-regular fa-clock text-xs"></i> <span id="badgeExpireText"></span>
           </span>
         </div>
         <div class="text-[11px] text-slate-400 font-mono" id="itemMetaTime">
@@ -284,6 +287,38 @@
 
       if (data.burn_after_reading) {
         document.getElementById('badgeBurn').classList.remove('hidden');
+      } else if (data.expires_at) {
+        const badgeExp = document.getElementById('badgeExpire');
+        const badgeExpText = document.getElementById('badgeExpireText');
+        if (badgeExp && badgeExpText) {
+          const d = new Date(data.expires_at);
+          if (!isNaN(d.getTime())) {
+            const now = new Date();
+            const diffSec = Math.floor((d.getTime() - now.getTime()) / 1000);
+            const hours = String(d.getHours()).padStart(2, '0');
+            const minutes = String(d.getMinutes()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const date = String(d.getDate()).padStart(2, '0');
+            const isToday = now.toDateString() === d.toDateString();
+            const when = isToday ? `今日 ${hours}:${minutes}` : `${month}-${date} ${hours}:${minutes}`;
+
+            let rel = '';
+            if (diffSec <= 0) {
+              rel = '已到期';
+            } else if (diffSec < 60) {
+              rel = '<1分钟后';
+            } else if (diffSec < 3600) {
+              rel = `${Math.ceil(diffSec / 60)}分钟后`;
+            } else if (diffSec < 86400) {
+              rel = `${Math.floor(diffSec / 3600)}小时后`;
+            } else {
+              rel = `${Math.floor(diffSec / 86400)}天后`;
+            }
+
+            badgeExpText.innerText = diffSec <= 0 ? '已到期 (即将清理)' : `将于 ${when} 自动销毁 (${rel})`;
+            badgeExp.classList.remove('hidden');
+          }
+        }
       }
 
       const mime = (data.mime_type || '').toLowerCase();
