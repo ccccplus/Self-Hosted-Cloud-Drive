@@ -1461,12 +1461,15 @@
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve();
             } else {
-              reject(new Error(`R2 直传失败 (HTTP ${xhr.status})。请确认已在 R2 存储桶设置中添加 CORS 跨域规则。`));
+              console.error('R2 Direct Upload Response Error:', xhr.status, xhr.responseText);
+              reject(new Error(`R2 直传响应异常 (HTTP ${xhr.status})。请确认 R2 令牌权限 (对象读写) 或 CORS 跨域规则。`));
             }
           };
 
-          xhr.onerror = () => {
-            reject(new Error('直传网络连接失败，请检查网络或 R2 跨域 (CORS) 配置'));
+          xhr.onerror = (err) => {
+            const urlBase = (reqData.upload_url || '').split('?')[0];
+            console.error('R2 Direct Upload Network Error. Target:', reqData.upload_url, err);
+            reject(new Error(`直传网络连接失败！\n目标地址: ${urlBase}\n请检查 CF_ACCOUNT_ID 是否正确或 R2 跨域 (CORS) 规则是否生效。`));
           };
 
           xhr.send(selectedFile);

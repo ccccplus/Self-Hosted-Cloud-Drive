@@ -90,10 +90,18 @@ async function hmacRaw(key, data) {
 }
 
 async function generateR2PresignedPutUrl(env, key, expiresInSeconds = 900) {
-  const accountId = (env.CF_ACCOUNT_ID || env.ACCOUNT_ID || '').trim();
-  const accessKeyId = (env.R2_ACCESS_KEY_ID || '').trim();
-  const secretAccessKey = (env.R2_SECRET_ACCESS_KEY || '').trim();
-  const bucketName = 'qr-relay-files';
+  let accountId = (env.CF_ACCOUNT_ID || env.ACCOUNT_ID || '').trim();
+  let accessKeyId = (env.R2_ACCESS_KEY_ID || '').trim().replace(/^["']|["']$/g, '');
+  let secretAccessKey = (env.R2_SECRET_ACCESS_KEY || '').trim().replace(/^["']|["']$/g, '');
+  const bucketName = (env.R2_BUCKET_NAME || 'qr-relay-files').trim();
+
+  // 关键清洗：如果用户填写的是完整 URL (如 https://xxx.r2.cloudflarestorage.com) 则自动提取纯 ID
+  accountId = accountId
+    .replace(/^https?:\/\//i, '')
+    .replace(/\.r2\.cloudflarestorage\.com.*$/i, '')
+    .replace(/\/.*$/, '')
+    .replace(/^["']|["']$/g, '')
+    .trim();
 
   if (!accountId || !accessKeyId || !secretAccessKey) {
     throw new Error('未配置 R2 API 令牌凭据 (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)');
