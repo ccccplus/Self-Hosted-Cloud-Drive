@@ -87,8 +87,12 @@ npx wrangler deploy
 | 变量名 | 默认值 | 说明 |
 | :--- | :--- | :--- |
 | `APP_NAME` | `QR-Relay` | 网站顶部展示的标题 |
-| `MAX_FILE_SIZE_MB` | `100` | 限制最大上传大小（MB） |
-| `ADMIN_PASSWORD` | `admin123` | **初始管理员密码**（登录后可在 OpenList 页面在线修改） |
+| `MAX_FILE_SIZE_MB` | `100` | 标准请求单文件上限（MB） |
+| `MAX_TOTAL_STORAGE_GB` | `10` | 全站总存储配额安全熔断上限（GB，防超额扣费） |
+| `ADMIN_PASSWORD` | `admin123` | **初始管理员密码**（登录后可在后台在线修改） |
+| `CF_ACCOUNT_ID` | *(空)* | 可选：Cloudflare 32 位账户 ID（开启 >100MB 直传时必填） |
+| `R2_ACCESS_KEY_ID` | *(空)* | 可选：R2 API 令牌 Access Key ID（开启 >100MB 直传时必填） |
+| `R2_SECRET_ACCESS_KEY` | *(空)* | 可选：R2 API 令牌 Secret Key（开启 >100MB 直传时必填） |
 | `OPENLIST_WEBDAV_URL` | *(空)* | 可选：你的公网 OpenList WebDAV 接口地址 |
 | `OPENLIST_USERNAME` | *(空)* | 可选：OpenList 用户名 |
 | `OPENLIST_PASSWORD` | *(空)* | 可选：OpenList 密码 |
@@ -98,7 +102,10 @@ npx wrangler deploy
 
 ## 💡 特性与机制
 
-1. **访客隔离与全站透视**：访客仅能在中转箱看到自己当前设备上传的文件；管理员登录后可透视全站所有分享的文件并分类筛选（全部/文件/文本）。
-2. **自动定时清理**：`wrangler.toml` 开启了 Cron Trigger（每 10 分钟自动执行一次），到期的文本和文件会被 Worker 自动从 D1 和 R2 物理销毁。
-3. **阅后即焚**：勾选阅后即焚的内容，首次被提取下载后立即异步从数据库和 R2 删除。
-4. **两套版本共存**：本目录下的 Cloudflare 代码与上级目录的原版 Python 代码完全独立，你可以根据喜好自由选择部署在云端 Cloudflare 或自己的本地/VPS 服务器！
+1. **>100MB 超大文件直传 (最高 5GB)**：通过原生 Web Crypto 算法签发 S3 v4 预签名链接，浏览器直接上传 R2 存储桶，突破 Worker 100MB 限制。
+2. **10GB 总空间安全熔断**：实时统计全站存储，超过 10GB 立即自动熔断并返回脱敏提示，永久保证 $0 免费运行。
+3. **中文视频流式播放与原名下载**：完整支持 RFC 6266 双模式回落（ASCII 兜底 + UTF-8 真实中文）与 HTTP 206 Range 分段视频流探测。
+4. **访客隔离与全站透视**：访客仅能在中转箱看到自己当前设备上传的文件；管理员登录后可透视全站所有分享的文件并分类筛选（全部/文件/文本）。
+5. **自动定时清理**：`wrangler.toml` 开启了 Cron Trigger（每 10 分钟自动执行一次），到期的文本和文件会被 Worker 自动从 D1 和 R2 物理销毁。
+6. **阅后即焚**：勾选阅后即焚的内容，首次被提取下载后立即异步从数据库和 R2 删除。
+7. **两套版本共存**：本目录下的 Cloudflare 代码与上级目录的原版 Python 代码完全独立，你可以根据喜好自由选择部署在云端 Cloudflare 或自己的本地/VPS 服务器！
