@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import (
     init_db, create_item, get_item_by_code, increment_views,
-    delete_item_by_code, get_recent_items,
+    delete_item_by_code, get_recent_items, get_total_storage_used,
     get_admin_password, set_admin_password,
     create_admin_token, verify_admin_token, revoke_admin_token
 )
@@ -217,9 +217,14 @@ async def admin_change_password(
 @app.get("/api/config")
 async def get_public_config(x_admin_token: Optional[str] = Header(None)):
     is_admin = verify_admin_token(x_admin_token)
+    current_storage = get_total_storage_used()
+    max_total_bytes = int(settings.MAX_TOTAL_STORAGE_GB * 1024 * 1024 * 1024)
     return {
         "app_name": settings.APP_NAME,
         "max_file_size_mb": settings.MAX_FILE_SIZE_MB,
+        "max_total_storage_gb": settings.MAX_TOTAL_STORAGE_GB,
+        "used_storage_bytes": current_storage,
+        "max_storage_bytes": max_total_bytes,
         "require_password": bool(settings.UPLOAD_PASSWORD),
         "openlist_configured": bool(settings.OPENLIST_WEBDAV_URL),
         "openlist_webdav_url": settings.OPENLIST_WEBDAV_URL if is_admin else None,
@@ -359,6 +364,9 @@ async def upload_file_relay(
     total_bytes = 0
     max_bytes = settings.MAX_FILE_SIZE_MB * 1024 * 1024
 
+    current_storage = get_total_storage_used()
+    max_total_bytes = int(settings.MAX_TOTAL_STORAGE_GB * 1024 * 1024 * 1024)
+
     with open(dest_path, "wb") as buffer:
         while True:
             chunk = await file.read(1024 * 1024) # 1MB chunk
@@ -367,7 +375,13 @@ async def upload_file_relay(
             total_bytes += len(chunk)
             if total_bytes > max_bytes:
                 dest_path.unlink(missing_ok=True)
-                raise HTTPException(status_code=413, detail=f"文件大小超出限制 ({settings.MAX_FILE_SIZE_MB}MB)")
+                raise HTTPException(status_code=413, detail=f"文件大小超出单文件限制 ({settings.MAX_FILE_SIZE_MB}MB)")
+            if current_storage + total_bytes > max_total_bytes:
+                dest_path.unlink(missing_ok=True)
+                raise HTTPException(
+                    status_code=413,
+                    detail="中转站存储空间不足！上传此文件将超出系统分配的存储配额。请先清理不需要的中转文件或等待到期自动销毁以腾出空间。"
+                )
             buffer.write(chunk)
 
     mime_type, _ = mimetypes.guess_type(orig_filename)

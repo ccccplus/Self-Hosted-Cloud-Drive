@@ -2,6 +2,7 @@ import asyncio
 import os
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 
@@ -290,6 +291,25 @@ class TestQRRelayCore(unittest.TestCase):
         cd_dl = r_dl.headers.get("content-disposition", "")
         self.assertIn("attachment", cd_dl)
         self.assertIn('filename="download.mp4"', cd_dl)
+
+    def test_total_storage_quota_enforcement(self):
+        import io
+        from fastapi.testclient import TestClient
+        from backend.main import app
+
+        client = TestClient(app)
+
+        # Mock current storage to exceed maximum configured capacity
+        with patch("backend.main.get_total_storage_used", return_value=10 * 1024 * 1024 * 1024):
+            files = {"file": ("test_file.dat", io.BytesIO(b"Hello QR-Relay Storage Limit"), "text/plain")}
+            res = client.post("/api/upload", files=files)
+            self.assertEqual(res.status_code, 413)
+            detail = res.json()["detail"]
+            self.assertIn("中转站存储空间不足！上传此文件将超出系统分配的存储配额", detail)
+            # Crucially verify that free-tier wording is NEVER revealed to the client
+            self.assertNotIn("免费", detail)
+            self.assertNotIn("额度", detail)
+            self.assertNotIn("白嫖", detail)
 
 if __name__ == "__main__":
     unittest.main()

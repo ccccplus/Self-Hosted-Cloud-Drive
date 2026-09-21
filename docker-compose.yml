@@ -16,6 +16,7 @@ services:
       # 请修改为你的公网 IP 或访问域名
       - BASE_URL=http://localhost:8080
       - MAX_FILE_SIZE_MB=100
+      - MAX_TOTAL_STORAGE_GB=10
       - UPLOAD_PASSWORD=
       - AUTO_CLEANUP_INTERVAL_SECONDS=60
       # 连接已有的 OpenList 服务 (若使用 host 网络或局域网 IP)

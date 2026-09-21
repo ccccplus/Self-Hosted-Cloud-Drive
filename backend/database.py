@@ -162,6 +162,13 @@ def increment_views(code: str) -> int:
         row = cursor.fetchone()
         return row[0] if row else 0
 
+def get_total_storage_used() -> int:
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(SUM(file_size), 0) FROM items WHERE type != 'text'")
+        row = cursor.fetchone()
+        return int(row[0]) if row else 0
+
 def delete_item_by_code(code: str) -> bool:
     with get_db_connection() as conn:
         cursor = conn.cursor()

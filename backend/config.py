@@ -27,6 +27,7 @@ class Settings:
         self.PORT: int = int(os.getenv("PORT", "8080"))
         self.BASE_URL: str = os.getenv("BASE_URL", "http://localhost:8080")
         self.MAX_FILE_SIZE_MB: int = int(os.getenv("MAX_FILE_SIZE_MB", "100"))
+        self.MAX_TOTAL_STORAGE_GB: float = float(os.getenv("MAX_TOTAL_STORAGE_GB", "10"))
         self.UPLOAD_PASSWORD: Optional[str] = os.getenv("UPLOAD_PASSWORD") or None
         self.ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "admin123")
         self.AUTO_CLEANUP_INTERVAL_SECONDS: int = int(os.getenv("AUTO_CLEANUP_INTERVAL_SECONDS", "60"))

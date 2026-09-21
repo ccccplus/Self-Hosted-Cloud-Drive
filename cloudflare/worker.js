@@ -290,9 +290,20 @@ export default {
       const token = request.headers.get('X-Admin-Token');
       const isAdmin = await verifyAdminToken(env.DB, token);
       const cfg = await getOpenListConfig(env.DB, env);
+      const maxTotalStorageGb = parseFloat(env.MAX_TOTAL_STORAGE_GB || "10");
+      const maxTotalBytes = maxTotalStorageGb * 1024 * 1024 * 1024;
+      let usedStorageBytes = 0;
+      try {
+        const sumRow = await env.DB.prepare("SELECT COALESCE(SUM(file_size), 0) as total_size FROM items WHERE type != 'text'").first();
+        usedStorageBytes = sumRow ? (Number(sumRow.total_size) || 0) : 0;
+      } catch {}
+
       return jsonResponse({
         app_name: env.APP_NAME || "QR-Relay",
         max_file_size_mb: parseInt(env.MAX_FILE_SIZE_MB || "100"),
+        max_total_storage_gb: maxTotalStorageGb,
+        used_storage_bytes: usedStorageBytes,
+        max_storage_bytes: maxTotalBytes,
         require_password: false,
         openlist_configured: Boolean(cfg.url),
         openlist_webdav_url: isAdmin ? cfg.url : null,
@@ -448,6 +459,19 @@ export default {
           detail: "Cloudflare R2 存储桶未绑定。请在 Cloudflare Workers 控制台 [设置] -> [绑定] 中添加 R2 存储桶，变量名称设为 qr-relay-files 或 BUCKET。"
         }, 500);
       }
+
+      // 校验存储配额（防止超出设定的存储空间上限）
+      const maxTotalStorageGb = parseFloat(env.MAX_TOTAL_STORAGE_GB || "10");
+      const maxTotalBytes = maxTotalStorageGb * 1024 * 1024 * 1024;
+      try {
+        const sumRow = await env.DB.prepare("SELECT COALESCE(SUM(file_size), 0) as total_size FROM items WHERE type != 'text'").first();
+        const currentStorage = sumRow ? (Number(sumRow.total_size) || 0) : 0;
+        if (currentStorage + file.size > maxTotalBytes) {
+          return jsonResponse({
+            detail: "中转站存储空间不足！上传此文件将超出系统分配的存储配额。请先清理不需要的中转文件或等待到期自动销毁以腾出空间。"
+          }, 413);
+        }
+      } catch {}
 
       const fileBuffer = await file.arrayBuffer();
       await env.BUCKET.put(r2Key, fileBuffer, {

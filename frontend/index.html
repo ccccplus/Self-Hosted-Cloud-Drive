@@ -625,6 +625,11 @@
             <i class="fa-brands fa-github text-xs"></i>
             <span>GitHub</span>
           </a>
+          <span id="storageQuotaSeparator" class="text-slate-300 hidden">|</span>
+          <span id="storageQuotaBadge" class="hidden text-slate-400 font-mono text-[11px] items-center gap-1">
+            <i class="fa-solid fa-hard-drive text-[10px] text-slate-400"></i>
+            <span id="storageQuotaText">存储配额: ...</span>
+          </span>
         </div>
 
         <!-- Admin Entry Button at bottom -->
@@ -1369,6 +1374,7 @@
           clearSelectedFile();
           document.getElementById('fileCustomCode').value = '';
           showToast('文件上传成功，已生成 6 位口令！');
+          fetchAppConfig();
         } else {
           try {
             const err = JSON.parse(xhr.responseText);
@@ -1693,6 +1699,7 @@
         removeUploadedCode(code);
         showToast('删除成功');
         loadRecentItems();
+        fetchAppConfig();
       } catch (err) {
         showToast(err.message, true);
       }
@@ -1736,6 +1743,19 @@
           const hintEl = document.getElementById('fileLimitHint');
           if (hintEl) {
             hintEl.innerText = `单文件上限 ${data.max_file_size_mb}MB，上传后将生成专属 6 位取件码与下载二维码`;
+          }
+        }
+        if (data.max_total_storage_gb) {
+          const badge = document.getElementById('storageQuotaBadge');
+          const sep = document.getElementById('storageQuotaSeparator');
+          const text = document.getElementById('storageQuotaText');
+          if (badge && text) {
+            const usedStr = formatBytes(data.used_storage_bytes || 0);
+            const totalStr = `${data.max_total_storage_gb} GB`;
+            text.innerText = `存储配额: ${usedStr} / ${totalStr}`;
+            badge.classList.remove('hidden');
+            badge.classList.add('inline-flex');
+            if (sep) sep.classList.remove('hidden');
           }
         }
         if (data.openlist_backup_path) {
