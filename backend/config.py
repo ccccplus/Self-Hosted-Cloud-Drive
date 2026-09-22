@@ -45,6 +45,12 @@ class Settings:
         self.OPENLIST_BACKUP_PATH: str = os.getenv("OPENLIST_BACKUP_PATH", "/QR-Relay-Backup")
         self.OPENLIST_AUTO_SYNC: bool = os.getenv("OPENLIST_AUTO_SYNC", "True").lower() in ["true", "1", "yes"]
 
+        # Cloudflare R2 Direct Upload Settings
+        self.CF_ACCOUNT_ID: Optional[str] = os.getenv("CF_ACCOUNT_ID") or None
+        self.R2_ACCESS_KEY_ID: Optional[str] = os.getenv("R2_ACCESS_KEY_ID") or None
+        self.R2_SECRET_ACCESS_KEY: Optional[str] = os.getenv("R2_SECRET_ACCESS_KEY") or None
+        self.R2_BUCKET_NAME: str = os.getenv("R2_BUCKET_NAME", "qr-relay-files")
+
         # Ensure directories exist
         self.DATA_DIR.mkdir(parents=True, exist_ok=True)
         self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)

@@ -311,6 +311,42 @@ class TestQRRelayCore(unittest.TestCase):
             self.assertNotIn("额度", detail)
             self.assertNotIn("白嫖", detail)
 
+    def test_r2_config_and_test_endpoints(self):
+        from fastapi.testclient import TestClient
+        from backend.main import app
+        from backend.database import create_admin_token
+
+        client = TestClient(app)
+        admin_token = create_admin_token()
+        headers = {"X-Admin-Token": admin_token}
+
+        # 1. Non-admin forbidden
+        res_fail = client.post("/api/r2/config", data={"account_id": "test_account"})
+        self.assertEqual(res_fail.status_code, 403)
+
+        # 2. Admin save R2 config
+        res_save = client.post("/api/r2/config", headers=headers, data={
+            "account_id": "cfat_12345678901234567890123456789012",
+            "access_key_id": "r2_key_abc",
+            "secret_access_key": "r2_secret_xyz",
+            "bucket_name": "qr-relay-files"
+        })
+        self.assertEqual(res_save.status_code, 200)
+        self.assertTrue(res_save.json()["success"])
+
+        # 3. Admin test R2 config
+        res_test = client.post("/api/r2/test", headers=headers)
+        self.assertEqual(res_test.status_code, 200)
+        self.assertTrue(res_test.json()["success"])
+        self.assertEqual(res_test.json()["account_id"], "cfat_12345678901234567890123456789012")
+
+        # 4. Public config reflects R2 admin fields
+        res_cfg = client.get("/api/config", headers=headers)
+        self.assertEqual(res_cfg.status_code, 200)
+        cfg_data = res_cfg.json()
+        self.assertEqual(cfg_data["r2_account_id"], "cfat_12345678901234567890123456789012")
+        self.assertTrue(cfg_data["r2_secret_configured"])
+
 if __name__ == "__main__":
     unittest.main()
 

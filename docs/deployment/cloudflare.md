@@ -182,22 +182,31 @@ QR-Relay 现已内置基于 **纯原生 Web Crypto 的 AWS S3 v4 签名直传协
    ]
    ```
 
-### 2. 生成 R2 API 令牌并填入 Worker
-1. 回到 R2 概览页，点击右侧栏的 **「管理 R2 API 令牌 (Manage R2 API Tokens)」**。
-2. 点击 **「创建 API 令牌」**：
-   - 令牌类型：选择 **「账户 API 令牌 (Account API Token)」**（推荐）。
-   - 权限范围：选择 **「对象读和写 (Object Read & Write)」**。
-   - 应用存储桶：选择 **`qr-relay-files`**。
-   - 点击创建，保存页面给出的 `Access Key ID` 与 `Secret Access Key`。
-3. **获取您的 Account ID**：
+### 2. 配置 R2 API 令牌（推荐：网页后台一键配置，永久保存至 D1 数据库）
+
+为确保证书与令牌在后续任何 GitHub 代码推送时不被 Cloudflare 重置，系统现已支持**将直传凭据直接持久化在 Cloudflare D1 数据库**中：
+
+1. **生成 R2 API 令牌**：
+   - 在 Cloudflare 控制台回到 R2 概览页，点击右侧栏的 **「管理 R2 API 令牌 (Manage R2 API Tokens)」**。
+   - 点击 **「创建 API 令牌」**：
+     - 令牌类型：选择 **「账户 API 令牌 (Account API Token)」**（推荐）。
+     - 权限范围：选择 **「对象读和写 (Object Read & Write)」**。
+     - 应用存储桶：选择 **`qr-relay-files`**。
+     - 点击创建，保存页面给出的 `Access Key ID` 与 `Secret Access Key`。
+2. **获取您的 Account ID**：
    - 查看浏览器地址栏：`https://dash.cloudflare.com/<这串32位纯字符>/workers...`，这串 32 位的字符就是您的账户 ID（注意：不要填成带 `cfat_` 前缀的令牌字符串）。
-4. **将变量绑定到 Worker**：
-   - 进入 **Workers 与 Pages** ➡️ 进入 `self-hosted-cloud-drive` ➡️ **「设置 (Settings)」** ➡️ **「变量和机密 (Variables and Secrets)」**。
-   - 逐个添加以下三个变量（建议添加为加密机密）：
+3. **在网页前端永久保存凭据（推荐，永不丢失）**：
+   - 打开您部署好的 QR-Relay 网站，在右上角或底部点击「管理设置」，输入管理员密码（默认 `admin123`）登录。
+   - 切换至 **「系统设置」** 页面，找到 **「Cloudflare R2 超大文件直传令牌」** 配置卡片。
+   - 依次填入 **Cloudflare 账户 ID**、**R2 存储桶名称** (`qr-relay-files`)、**Access Key ID** 与 **Secret Access Key**。
+   - 点击 **「永久保存直传密钥」**，再点击 **「校验直传」**。
+   - 💡 **为什么推荐此方式？**  
+     Cloudflare 关联 GitHub 仓库部署时，若在后台添加普通的环境变量，每次推代码部署时 Cloudflare 会以 `wrangler.toml` 为准将未记录在文件中的环境变量覆盖重置。而**保存在 D1 数据库中的配置永久独立存在，绝不被任何 Git 推送或构建覆盖**！
+4. **备用方式：通过 Cloudflare 控制台配置为机密 (Secrets)**：
+   - 若不希望写入数据库，也可在 Worker **「设置」** ➡️ **「变量和机密」** 中添加为加密机密（Secrets）：
      - `CF_ACCOUNT_ID`：您的 32 位 Cloudflare 账户 ID
-     - `R2_ACCESS_KEY_ID`：刚才生成的 Access Key ID
-     - `R2_SECRET_ACCESS_KEY`：刚才生成的 Secret Access Key
-   - 点击 **部署/保存** 即可立即生效！
+     - `R2_ACCESS_KEY_ID`：生成的 Access Key ID
+     - `R2_SECRET_ACCESS_KEY`：生成的 Secret Access Key
 
 ---
 

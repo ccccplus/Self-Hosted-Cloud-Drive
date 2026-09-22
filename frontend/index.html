@@ -200,9 +200,9 @@
         onclick="switchTab('openlist')" 
         id="tab-btn-openlist" 
         class="tab-btn py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold transition-all flex items-center justify-center gap-1 text-slate-600 hover:text-slate-900 hidden"
-        title="OpenList 状态与多网盘设置"
+        title="系统设置与存储配置"
       >
-        <i class="fa-solid fa-hard-drive text-xs"></i>
+        <i class="fa-solid fa-sliders text-xs"></i>
       </button>
     </nav>
 
@@ -447,11 +447,96 @@
       <div class="space-y-5">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-xl flex-shrink-0">
-            <i class="fa-solid fa-hard-drive"></i>
+            <i class="fa-solid fa-sliders"></i>
           </div>
           <div>
-            <h2 class="text-base font-bold text-slate-900">OpenList 多网盘备份与存储路径</h2>
-            <p class="text-xs text-slate-500">解答：当 OpenList 绑定多个网盘时，备份文件究竟会存在哪个网盘？</p>
+            <h2 class="text-base font-bold text-slate-900">系统存储与直传设置 (Admin)</h2>
+            <p class="text-xs text-slate-500">配置 R2 超大文件直传令牌、OpenList 多网盘备份及管理员密码</p>
+          </div>
+        </div>
+
+        <!-- R2 Direct Upload Configuration Card (D1 Database Persistent) -->
+        <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-4 text-xs">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-100">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-slate-800 font-bold text-xs flex items-center gap-1.5">
+                  <i class="fa-solid fa-bolt text-amber-500"></i> Cloudflare R2 超大文件直传令牌 (D1 数据库永久持久化)
+                </span>
+                <span id="cfgR2Badge" class="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 text-slate-500">
+                  检测中...
+                </span>
+              </div>
+              <p class="text-slate-500 text-[11px] mt-1">
+                支持单文件突破 100MB 限制（最高 5GB 直传 R2 存储桶）。填入后<strong>永久保存在 D1 数据库</strong>，后续无论在 GitHub 提交代码或 Worker 自动重新部署，<strong>均永不丢失！</strong>
+              </p>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <button 
+                onclick="testR2Config()" 
+                id="btnTestR2"
+                class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow transition-all flex items-center gap-1.5 active:scale-95"
+              >
+                <i class="fa-solid fa-vial"></i> 校验直传
+              </button>
+            </div>
+          </div>
+
+          <div id="testR2Result" class="hidden text-xs font-medium"></div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-slate-500 text-[11px] font-semibold mb-1">Cloudflare 账户 ID (Account ID)</label>
+              <input 
+                type="text" 
+                id="inputR2AccountId" 
+                placeholder="例如: 32位十六进制字符串"
+                class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-amber-500 focus:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label class="block text-slate-500 text-[11px] font-semibold mb-1">R2 存储桶名称 (Bucket Name)</label>
+              <input 
+                type="text" 
+                id="inputR2BucketName" 
+                value="qr-relay-files"
+                placeholder="默认: qr-relay-files"
+                class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-amber-500 focus:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label class="block text-slate-500 text-[11px] font-semibold mb-1">R2 访问密钥 ID (Access Key ID)</label>
+              <input 
+                type="text" 
+                id="inputR2AccessKey" 
+                placeholder="例如: 32位 Access Key ID"
+                class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-amber-500 focus:bg-white transition-all"
+              />
+            </div>
+            <div>
+              <label class="block text-slate-500 text-[11px] font-semibold mb-1">R2 机密访问密钥 (Secret Access Key)</label>
+              <input 
+                type="password" 
+                id="inputR2SecretKey" 
+                placeholder="例如: 64位 Secret Access Key (留空保持不变)"
+                class="w-full p-2.5 rounded-xl bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 outline-none focus:border-amber-500 focus:bg-white transition-all"
+              />
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1">
+            <div class="flex items-center gap-2">
+              <button 
+                onclick="saveR2Config()"
+                id="btnSaveR2"
+                class="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center gap-2 active:scale-95"
+              >
+                <i class="fa-solid fa-floppy-disk"></i> 永久保存直传密钥
+              </button>
+            </div>
+            <span class="text-[11px] text-slate-400">
+              💡 提示：密钥持久保存在 D1 数据库中，对前端访客严格脱敏，不经过 Git。
+            </span>
           </div>
         </div>
 
@@ -1338,7 +1423,13 @@
       // 如果单文件超过标准限制 (100MB)
       if (selectedFile.size > standardMaxBytes) {
         if (!directConfigured) {
-          showToast(`该文件 (${formatBytes(selectedFile.size)}) 超出单文件限制 (${Math.round(standardMaxBytes / (1024 * 1024))}MB)。如需直传超大文件，请先在 Cloudflare 后台配置 R2 令牌。`, true);
+          if (isAdmin) {
+            showToast(`该文件 (${formatBytes(selectedFile.size)}) 超出单文件限制 (100MB)。已为您切换到系统设置，请在【直传设置】中填入 R2 令牌。`, true);
+            switchTab('openlist');
+          } else {
+            showToast(`该文件 (${formatBytes(selectedFile.size)}) 超出单文件限制 (100MB)。如需直传超大文件，请先登录管理员配置 R2 直传令牌。`, true);
+            openAdminModal();
+          }
           return;
         }
         await submitDirectFile();
@@ -1946,7 +2037,112 @@
           const pathEl = document.getElementById('inputBackupPath');
           if (pathEl) pathEl.value = data.openlist_backup_path;
         }
+
+        // R2 直传凭据回显与就绪状态更新
+        const cfgR2Badge = document.getElementById('cfgR2Badge');
+        if (cfgR2Badge) {
+          if (data.direct_upload_configured) {
+            cfgR2Badge.innerText = '🟢 已就绪 (永久生效)';
+            cfgR2Badge.className = 'px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300';
+          } else {
+            cfgR2Badge.innerText = '⚪ 未配置';
+            cfgR2Badge.className = 'px-2 py-0.5 text-[10px] font-semibold rounded-full bg-slate-100 text-slate-500 border border-slate-200';
+          }
+        }
+        if (data.r2_account_id) {
+          const accEl = document.getElementById('inputR2AccountId');
+          if (accEl && !accEl.value) accEl.value = data.r2_account_id;
+        }
+        if (data.r2_bucket_name) {
+          const bktEl = document.getElementById('inputR2BucketName');
+          if (bktEl && !bktEl.value) bktEl.value = data.r2_bucket_name;
+        }
+        if (data.r2_access_key_id) {
+          const keyEl = document.getElementById('inputR2AccessKey');
+          if (keyEl && !keyEl.value) keyEl.value = data.r2_access_key_id;
+        }
+        if (data.r2_secret_configured) {
+          const secEl = document.getElementById('inputR2SecretKey');
+          if (secEl) secEl.placeholder = '•••••••• (已保存于数据库，留空保持不变)';
+        }
       } catch {}
+    }
+
+    // --- R2 Direct Upload Config Management ---
+    async function saveR2Config() {
+      const btn = document.getElementById('btnSaveR2');
+      const accountId = (document.getElementById('inputR2AccountId').value || '').trim();
+      const bucketName = (document.getElementById('inputR2BucketName').value || '').trim();
+      const accessKey = (document.getElementById('inputR2AccessKey').value || '').trim();
+      const secretKey = (document.getElementById('inputR2SecretKey').value || '').trim();
+
+      const formData = new FormData();
+      formData.append('account_id', accountId);
+      formData.append('bucket_name', bucketName);
+      formData.append('access_key_id', accessKey);
+      if (secretKey) formData.append('secret_access_key', secretKey);
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 保存中...';
+
+      try {
+        const headers = adminToken ? { 'X-Admin-Token': adminToken } : {};
+        const res = await fetch('/api/r2/config', { method: 'POST', headers, body: formData });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(data.message || 'R2 直传凭据已永久保存！');
+          document.getElementById('inputR2SecretKey').value = '';
+          await fetchAppConfig();
+          testR2Config();
+        } else {
+          showToast(data.detail || '保存失败', true);
+        }
+      } catch (err) {
+        showToast('保存异常: ' + err.message, true);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> 永久保存直传密钥';
+      }
+    }
+
+    async function testR2Config() {
+      const resultBox = document.getElementById('testR2Result');
+      const btn = document.getElementById('btnTestR2');
+      if (resultBox) {
+        resultBox.classList.remove('hidden');
+        resultBox.className = 'text-xs font-mono text-slate-500 p-3 bg-slate-50 rounded-xl border border-slate-200';
+        resultBox.innerText = '正在验证直传凭据与 S3 预签名机制...';
+      }
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> 校验中...';
+      }
+
+      try {
+        const headers = adminToken ? { 'X-Admin-Token': adminToken } : {};
+        const res = await fetch('/api/r2/test', { method: 'POST', headers });
+        const data = await res.json();
+        if (resultBox) {
+          if (data.success) {
+            resultBox.className = 'text-xs font-mono text-emerald-700 p-3 bg-emerald-50 rounded-xl border border-emerald-200';
+            resultBox.innerHTML = `✅ ${data.message}`;
+          } else {
+            resultBox.className = 'text-xs font-mono text-rose-700 p-3 bg-rose-50 rounded-xl border border-rose-200';
+            resultBox.innerHTML = `❌ ${data.message}`;
+          }
+        }
+        await fetchAppConfig();
+      } catch (err) {
+        if (resultBox) {
+          resultBox.className = 'text-xs font-mono text-rose-700 p-3 bg-rose-50 rounded-xl border border-rose-200';
+          resultBox.innerText = `❌ 请求异常: ${err.message}`;
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fa-solid fa-vial"></i> 校验直传';
+        }
+      }
     }
 
     async function saveOpenListConfig() {

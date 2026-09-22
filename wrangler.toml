@@ -42,7 +42,8 @@ ADMIN_PASSWORD = "admin123"
 
 # -------------------------------------------------------------
 # Optional: R2 Direct Upload for >100MB files (up to 5GB)
-# 在 Cloudflare 控制台 [Worker 设置] -> [变量与机密] 中添加以下变量开启：
+# 【推荐】直接在网页【系统设置】(管理员模式) 中填写并永久存入 D1 数据库，永不丢失！
+# 如需通过 Cloudflare 控制台配置，请在 [Worker 设置] -> [变量与机密] 中添加机密 (Secrets) 或变量：
 # CF_ACCOUNT_ID = "your-account-id"
 # R2_ACCESS_KEY_ID = "your-r2-access-key-id"
 # R2_SECRET_ACCESS_KEY = "your-r2-secret-access-key"

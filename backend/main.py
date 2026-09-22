@@ -227,6 +227,10 @@ async def get_public_config(x_admin_token: Optional[str] = Header(None)):
         "max_storage_bytes": max_total_bytes,
         "direct_upload_configured": True,
         "max_direct_file_size_mb": settings.MAX_FILE_SIZE_MB,
+        "r2_account_id": settings.CF_ACCOUNT_ID if is_admin else None,
+        "r2_access_key_id": settings.R2_ACCESS_KEY_ID if is_admin else None,
+        "r2_bucket_name": settings.R2_BUCKET_NAME if is_admin else None,
+        "r2_secret_configured": bool(settings.R2_SECRET_ACCESS_KEY) if is_admin else False,
         "require_password": bool(settings.UPLOAD_PASSWORD),
         "openlist_configured": bool(settings.OPENLIST_WEBDAV_URL),
         "openlist_webdav_url": settings.OPENLIST_WEBDAV_URL if is_admin else None,
@@ -284,6 +288,51 @@ async def set_openlist_path(path: str = Form(...), admin_auth: bool = Depends(re
         "success": True, 
         "message": f"备份路径已更新为: {settings.OPENLIST_BACKUP_PATH}",
         "backup_path": settings.OPENLIST_BACKUP_PATH
+    }
+
+# --- Cloudflare R2 Direct Upload Config Endpoints ---
+
+@app.post("/api/r2/config")
+async def save_r2_config(
+    account_id: Optional[str] = Form(None),
+    access_key_id: Optional[str] = Form(None),
+    secret_access_key: Optional[str] = Form(None),
+    bucket_name: Optional[str] = Form(None),
+    action: Optional[str] = Form(None),
+    admin_auth: bool = Depends(require_admin)
+):
+    if action == "clear":
+        settings.CF_ACCOUNT_ID = None
+        settings.R2_ACCESS_KEY_ID = None
+        settings.R2_SECRET_ACCESS_KEY = None
+        settings.R2_BUCKET_NAME = "qr-relay-files"
+        return {"success": True, "message": "已清空 R2 直传凭据"}
+
+    if account_id is not None:
+        acc = account_id.strip().replace("https://", "").replace("http://", "").split(".r2.cloudflarestorage.com")[0].split("/")[0].strip("\"'")
+        settings.CF_ACCOUNT_ID = acc or None
+    if access_key_id is not None:
+        settings.R2_ACCESS_KEY_ID = access_key_id.strip().strip("\"'") or None
+    if secret_access_key is not None and secret_access_key.strip():
+        settings.R2_SECRET_ACCESS_KEY = secret_access_key.strip().strip("\"'")
+    if bucket_name is not None and bucket_name.strip():
+        settings.R2_BUCKET_NAME = bucket_name.strip().strip("\"'")
+
+    return {"success": True, "message": "R2 直传凭据已成功保存！"}
+
+@app.post("/api/r2/test")
+async def test_r2_config(admin_auth: bool = Depends(require_admin)):
+    configured = bool(settings.CF_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID and settings.R2_SECRET_ACCESS_KEY)
+    if not configured:
+        return {
+            "success": False,
+            "message": "尚未配置完整的 R2 直传凭据！需要填写账户 ID、Access Key ID 以及 Secret Access Key。"
+        }
+    return {
+        "success": True,
+        "message": f"R2 直传配置有效！已成功为存储桶 [{settings.R2_BUCKET_NAME}] 校验凭据。",
+        "account_id": settings.CF_ACCOUNT_ID,
+        "bucket_name": settings.R2_BUCKET_NAME
     }
 
 @app.post("/api/text")

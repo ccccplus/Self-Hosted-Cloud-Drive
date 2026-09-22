@@ -89,11 +89,26 @@ async function hmacRaw(key, data) {
   return new Uint8Array(sig);
 }
 
-async function generateR2PresignedPutUrl(env, key, expiresInSeconds = 900) {
-  let accountId = (env.CF_ACCOUNT_ID || env.ACCOUNT_ID || '').trim();
-  let accessKeyId = (env.R2_ACCESS_KEY_ID || '').trim().replace(/^["']|["']$/g, '');
-  let secretAccessKey = (env.R2_SECRET_ACCESS_KEY || '').trim().replace(/^["']|["']$/g, '');
-  const bucketName = (env.R2_BUCKET_NAME || 'qr-relay-files').trim();
+// 获取 R2 直传配置（优先数据库 system_settings，兜底环境变量）
+async function getR2DirectConfig(db, env) {
+  let accountId = ((env && (env.CF_ACCOUNT_ID || env.ACCOUNT_ID)) || '').trim();
+  let accessKeyId = ((env && env.R2_ACCESS_KEY_ID) || '').trim().replace(/^["']|["']$/g, '');
+  let secretAccessKey = ((env && env.R2_SECRET_ACCESS_KEY) || '').trim().replace(/^["']|["']$/g, '');
+  let bucketName = ((env && env.R2_BUCKET_NAME) || 'qr-relay-files').trim();
+
+  if (db) {
+    try {
+      const { results } = await db.prepare(
+        "SELECT key, value FROM system_settings WHERE key IN ('r2_account_id', 'r2_access_key_id', 'r2_secret_access_key', 'r2_bucket_name')"
+      ).all();
+      for (const r of (results || [])) {
+        if (r.key === 'r2_account_id' && r.value) accountId = r.value.trim();
+        if (r.key === 'r2_access_key_id' && r.value) accessKeyId = r.value.trim();
+        if (r.key === 'r2_secret_access_key' && r.value) secretAccessKey = r.value.trim();
+        if (r.key === 'r2_bucket_name' && r.value) bucketName = r.value.trim();
+      }
+    } catch {}
+  }
 
   // 关键清洗：如果用户填写的是完整 URL (如 https://xxx.r2.cloudflarestorage.com) 则自动提取纯 ID
   accountId = accountId
@@ -102,10 +117,34 @@ async function generateR2PresignedPutUrl(env, key, expiresInSeconds = 900) {
     .replace(/\/.*$/, '')
     .replace(/^["']|["']$/g, '')
     .trim();
+  accessKeyId = accessKeyId.replace(/^["']|["']$/g, '').trim();
+  secretAccessKey = secretAccessKey.replace(/^["']|["']$/g, '').trim();
+  bucketName = bucketName.replace(/^["']|["']$/g, '').trim();
 
-  if (!accountId || !accessKeyId || !secretAccessKey) {
+  const isConfigured = Boolean(accountId && accessKeyId && secretAccessKey);
+  return { accountId, accessKeyId, secretAccessKey, bucketName, isConfigured };
+}
+
+async function generateR2PresignedPutUrl(db, env, key, expiresInSeconds = 900) {
+  // 兼顾 (db, env, key, expires) 与 (env, key, expires) 两种签名调用
+  let targetDb = db;
+  let targetEnv = env;
+  let targetKey = key;
+  let targetExpires = expiresInSeconds;
+
+  if (typeof env === 'string') {
+    targetEnv = db;
+    targetDb = (db && db.DB) || null;
+    targetKey = env;
+    targetExpires = key || 900;
+  }
+
+  const r2Cfg = await getR2DirectConfig(targetDb, targetEnv);
+  if (!r2Cfg.isConfigured) {
     throw new Error('未配置 R2 API 令牌凭据 (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)');
   }
+
+  const { accountId, accessKeyId, secretAccessKey, bucketName } = r2Cfg;
 
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
@@ -391,9 +430,7 @@ export default {
         usedStorageBytes = sumRow ? (Number(sumRow.total_size) || 0) : 0;
       } catch {}
 
-      const directUploadConfigured = Boolean(
-        env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && (env.CF_ACCOUNT_ID || env.ACCOUNT_ID)
-      );
+      const r2Cfg = await getR2DirectConfig(env.DB, env);
 
       return jsonResponse({
         app_name: env.APP_NAME || "QR-Relay",
@@ -401,7 +438,11 @@ export default {
         max_total_storage_gb: maxTotalStorageGb,
         used_storage_bytes: usedStorageBytes,
         max_storage_bytes: maxTotalBytes,
-        direct_upload_configured: directUploadConfigured,
+        direct_upload_configured: r2Cfg.isConfigured,
+        r2_account_id: isAdmin ? r2Cfg.accountId : null,
+        r2_access_key_id: isAdmin ? r2Cfg.accessKeyId : null,
+        r2_bucket_name: isAdmin ? r2Cfg.bucketName : null,
+        r2_secret_configured: isAdmin ? Boolean(r2Cfg.secretAccessKey) : false,
         max_direct_file_size_mb: parseInt(env.MAX_DIRECT_FILE_SIZE_MB || "5120"),
         require_password: false,
         openlist_configured: Boolean(cfg.url),
@@ -664,10 +705,10 @@ export default {
 
       let uploadUrl;
       try {
-        uploadUrl = await generateR2PresignedPutUrl(env, r2Key, 900);
+        uploadUrl = await generateR2PresignedPutUrl(env.DB, env, r2Key, 900);
       } catch (err) {
         return jsonResponse({
-          detail: "超大文件直传未就绪：请先在 Cloudflare 控制台为 Worker 配置 R2 API 令牌 (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)。"
+          detail: "超大文件直传未就绪：请先在系统设置中配置 R2 API 令牌凭据 (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY)。"
         }, 500);
       }
 
@@ -1050,6 +1091,87 @@ export default {
         "INSERT INTO system_settings (key, value) VALUES ('openlist_backup_path', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
       ).bind(p).run();
       return jsonResponse({ success: true, message: `备份路径已更新为: ${p}`, backup_path: p });
+    }
+
+    // --- 路由 15: R2 直传凭据管理接口 (永久保存在 D1 数据库) ---
+    if (path === '/api/r2/config' && method === 'POST') {
+      const token = request.headers.get('X-Admin-Token');
+      if (!(await verifyAdminToken(env.DB, token))) return jsonResponse({ detail: "需要管理员权限" }, 403);
+
+      const formData = await request.formData();
+      if (formData.get('action') === 'clear') {
+        await env.DB.prepare(
+          "DELETE FROM system_settings WHERE key IN ('r2_account_id', 'r2_access_key_id', 'r2_secret_access_key', 'r2_bucket_name')"
+        ).run();
+        return jsonResponse({ success: true, message: "已清空数据库中存储的 R2 直传凭据" });
+      }
+
+      let accountId = (formData.get('account_id') || '').trim();
+      let accessKeyId = (formData.get('access_key_id') || '').trim();
+      let secretAccessKey = (formData.get('secret_access_key') || '').trim();
+      let bucketName = (formData.get('bucket_name') || '').trim() || 'qr-relay-files';
+
+      // 提取清洗
+      accountId = accountId
+        .replace(/^https?:\/\//i, '')
+        .replace(/\.r2\.cloudflarestorage\.com.*$/i, '')
+        .replace(/\/.*$/, '')
+        .replace(/^["']|["']$/g, '')
+        .trim();
+      accessKeyId = accessKeyId.replace(/^["']|["']$/g, '').trim();
+      secretAccessKey = secretAccessKey.replace(/^["']|["']$/g, '').trim();
+      bucketName = bucketName.replace(/^["']|["']$/g, '').trim();
+
+      if (accountId) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('r2_account_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(accountId).run();
+      }
+      if (accessKeyId) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('r2_access_key_id', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(accessKeyId).run();
+      }
+      if (secretAccessKey) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('r2_secret_access_key', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(secretAccessKey).run();
+      }
+      if (bucketName) {
+        await env.DB.prepare(
+          "INSERT INTO system_settings (key, value) VALUES ('r2_bucket_name', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+        ).bind(bucketName).run();
+      }
+
+      return jsonResponse({ success: true, message: "R2 直传凭据已永久保存至 D1 数据库！后续 GitHub 推送绝不会丢失。" });
+    }
+
+    if (path === '/api/r2/test' && method === 'POST') {
+      const token = request.headers.get('X-Admin-Token');
+      if (!(await verifyAdminToken(env.DB, token))) return jsonResponse({ detail: "需要管理员权限" }, 403);
+
+      const r2Cfg = await getR2DirectConfig(env.DB, env);
+      if (!r2Cfg.isConfigured) {
+        return jsonResponse({
+          success: false,
+          message: "尚未完整配置 R2 直传凭据！需要填写 Cloudflare 账户 ID、Access Key ID 以及 Secret Access Key。"
+        });
+      }
+
+      try {
+        const testUrl = await generateR2PresignedPutUrl(env.DB, env, `test_verify_${Date.now()}.tmp`, 300);
+        return jsonResponse({
+          success: true,
+          message: `R2 直传配置有效！已成功为存储桶 [${r2Cfg.bucketName}] 校验并生成 S3 预签名签名。`,
+          account_id: r2Cfg.accountId,
+          bucket_name: r2Cfg.bucketName
+        });
+      } catch (err) {
+        return jsonResponse({
+          success: false,
+          message: `直传凭据校验失败: ${err.message}`
+        });
+      }
     }
 
     if (path.endsWith('/sync') && method === 'POST') {
